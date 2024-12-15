@@ -1,0 +1,3 @@
+[submodule "pkgs/gui_interface/libs/GUIBaseCpp"]
+	path = pkgs/gui_interface/libs/GUIBaseCpp
+	url = https://github.com/dbooth05/GUIBaseCpp.git
