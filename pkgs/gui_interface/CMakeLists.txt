@@ -16,27 +16,27 @@ find_package(SDL2 REQUIRED CONFIG COMPONENTS SDL2main)
 
 # imgui
 set(IMGUI_SRC_FILES
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui_demo.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui_draw.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui_tables.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui_widgets.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/backends/imgui_impl_sdl2.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/backends/imgui_impl_sdlrenderer2.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/imgui_demo.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/imgui_draw.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/imgui_tables.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/imgui_widgets.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/imgui.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/backends/imgui_impl_sdl2.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/backends/imgui_impl_sdlrenderer2.cpp
 )
 
-add_executable(main ${IMGUI_SRC_FILES} src/test.cpp)
+add_executable(main ${IMGUI_SRC_FILES} ${CUSTOMS} src/test.cpp)
 
 ament_target_dependencies(main rclcpp sensor_msgs std_msgs)
 
 target_include_directories(main PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include>
   $<INSTALL_INTERFACE:include>
 )
 
-target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui)
-target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/backends)
-
+target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui)
+target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/backends)
 
 target_compile_features(main PUBLIC c_std_99 cxx_std_20)  # Require C99 and C++20
 
@@ -46,7 +46,7 @@ if(TARGET SDL2::SDL2main)
     target_link_libraries(main SDL2::SDL2main)
 endif()
 
-# Link to the actual SDL2 library. SDL2::SDL2 is the shared SDL library, SDL2::SDL2-static is the static SDL libarary.
+# Link to the actual SDL2 library. SDL2::SDL2 is the shared SDL library, SDL2::SDL2-static is the static SDL library.
 target_link_libraries(main SDL2::SDL2)
 
 install(TARGETS main
