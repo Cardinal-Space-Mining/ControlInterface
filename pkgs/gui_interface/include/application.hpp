@@ -2,6 +2,10 @@
 #define APPLICATION_HPP
 
 #include <chrono>
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/int8.hpp>
+
+#include "custom_types/msg/talon_info.hpp"
 
 #include <SDL2/SDL.h>
 #include <stdio.h>
@@ -12,9 +16,8 @@
 
 #include "custom_elements.hpp"
 
-#include "panel.hpp"
-
 using namespace std::chrono_literals;
+using namespace custom_types::msg;
 
 #define WIDTH 800
 #define HEIGHT 600
@@ -25,7 +28,25 @@ class Application : public rclcpp::Node {
             , wind(SDL_CreateWindow("Mission Control GUI", SDL_WINDOWPOS_CENTERED,
                                     SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE))
             , rend(SDL_CreateRenderer(wind, -1, SDL_RENDERER_ACCELERATED))
-            // , update_timer(create_wall_timer(100ms, [this]() { this->update(); }))
+            // Motor info Subscribers
+            , track_right_info(this->create_subscription<TalonInfo>(
+                "track_right_info", 10, [this](const TalonInfo &msg)
+                { update_info(msg, 0); }))
+            , track_left_info(this->create_subscription<TalonInfo>(
+                "track_left_info", 10, [this](const TalonInfo &msg)
+                { update_info(msg, 1); }))
+            , trencher_info(this->create_subscription<TalonInfo>(
+                "hopper_info", 10, [this](const TalonInfo &msg)
+                { update_info(msg, 2); }))
+            , hopper_belt_info(this->create_subscription<TalonInfo>(
+                "hopper_belt_info", 10, [this](const TalonInfo &msg)
+                { update_info(msg, 3); }))
+            , hopper_actuator_info(this->create_subscription<TalonInfo>(
+                "hopper_info", 10, [this](const TalonInfo &msg)
+                { update_info(msg, 4); }))
+            // Robot Status Publisher
+            , robot_status_pub(this->create_publisher<std_msgs::msg::Int8>(
+                "robot_status", 10))
         {
 
             if (!wind) {
@@ -44,7 +65,12 @@ class Application : public rclcpp::Node {
                 rclcpp::shutdown();
             }
 
-            update_timer = create_wall_timer(10ms, [this]() { this->update(); });
+            // Initializing Timers for update gui and sending robot status
+            update_timer        = create_wall_timer(25ms, [this]() { this->update(); });
+            status_update_timer = create_wall_timer(100ms, [this]() {
+                std_msgs::msg::Int8 state;
+                state.data = static_cast<int>(robot_status);
+            });
 
             init_elements();
 
@@ -132,6 +158,10 @@ class Application : public rclcpp::Node {
             }
         }
 
+        void update_info(const TalonInfo &msg, const int id) {
+
+        }
+
     // SDL and ImGui Storing and Configs
     private:
         SDL_Window* wind;
@@ -140,17 +170,29 @@ class Application : public rclcpp::Node {
     // Timer base
     private:
         rclcpp::TimerBase::SharedPtr update_timer;
+        rclcpp::TimerBase::SharedPtr status_update_timer;
 
-    // Robot Status Toggle
+    // Robot Status Toggle (ImGui)
     private:
         int robot_status = 1;
         std::vector<std::string> status_options = {"autonomous", "disabled", "teleop"};
         std::vector<BASE_COLORS> toggle_cols = {BASE_COLORS::BLUE, BASE_COLORS::RED, BASE_COLORS::GREEN};
         MultiToggle status_toggle;
 
-    // Motor Status Info
+    // Motor Status Info (ImGui)
     private:
-        
+
+
+    // Publisher and Subscriber Nodes
+    private:
+        rclcpp::Subscription<TalonInfo>::SharedPtr track_right_info;
+        rclcpp::Subscription<TalonInfo>::SharedPtr track_left_info;
+        rclcpp::Subscription<TalonInfo>::SharedPtr trencher_info;
+        rclcpp::Subscription<TalonInfo>::SharedPtr hopper_belt_info;
+        rclcpp::Subscription<TalonInfo>::SharedPtr hopper_actuator_info;
+
+        rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr robot_status_pub;    
+
 };
 
 #endif
