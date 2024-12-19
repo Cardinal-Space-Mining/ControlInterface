@@ -26,7 +26,13 @@ set(IMGUI_SRC_FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/backends/imgui_impl_sdlrenderer2.cpp
 )
 
-add_executable(main ${IMGUI_SRC_FILES} ${CUSTOMS} src/test.cpp)
+# implot
+set(IMPLOT_SRC_FILES
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/implot/implot.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/implot/implot_items.cpp
+)
+
+add_executable(main ${IMGUI_SRC_FILES} ${IMPLOT_SRC_FILES} ${CUSTOMS} src/test.cpp)
 
 ament_target_dependencies(main rclcpp sensor_msgs std_msgs custom_types)
 
@@ -36,6 +42,7 @@ target_include_directories(main PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
+target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/implot)
 target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui)
 target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/backends)
 

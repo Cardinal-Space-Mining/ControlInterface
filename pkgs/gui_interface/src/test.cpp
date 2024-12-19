@@ -25,13 +25,6 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    // Initialize ImGui
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); 
-    (void)io;
-    ImGui::StyleColorsDark();
-
     // Load ROS2
     rclcpp::init(argc, argv);
 
