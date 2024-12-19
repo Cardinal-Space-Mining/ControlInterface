@@ -22,13 +22,14 @@
 #include "custom_elements.hpp"
 
 #include "motor_info.hpp"
+#include "info_plot.hpp"
 
 using std::vector;
 using namespace std::chrono_literals;
 using namespace custom_types::msg;
 
-#define WIDTH 800
-#define HEIGHT 600
+#define WIDTH 1200
+#define HEIGHT 900
 #define BUFFER_SIZE 250
 
 class Application : public rclcpp::Node {
@@ -38,24 +39,26 @@ class Application : public rclcpp::Node {
                                     SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE))
             , rend(SDL_CreateRenderer(wind, -1, SDL_RENDERER_ACCELERATED))
             // Motor info Subscribers
-            , track_right_info(this->create_subscription<TalonInfo>(
-                "track_right_info", 10, [this](const TalonInfo &msg)
+            , track_right_sub(this->create_subscription<TalonInfo>(
+                "track_right_sub", 10, [this](const TalonInfo &msg)
                 { update_info(msg, 0); }))
-            , track_left_info(this->create_subscription<TalonInfo>(
-                "track_left_info", 10, [this](const TalonInfo &msg)
+            , track_left_sub(this->create_subscription<TalonInfo>(
+                "track_left_sub", 10, [this](const TalonInfo &msg)
                 { update_info(msg, 1); }))
-            , trencher_info(this->create_subscription<TalonInfo>(
+            , trencher_sub(this->create_subscription<TalonInfo>(
                 "hopper_info", 10, [this](const TalonInfo &msg)
                 { update_info(msg, 2); }))
-            , hopper_belt_info(this->create_subscription<TalonInfo>(
-                "hopper_belt_info", 10, [this](const TalonInfo &msg)
+            , hopper_belt_sub(this->create_subscription<TalonInfo>(
+                "hopper_belt_sub", 10, [this](const TalonInfo &msg)
                 { update_info(msg, 3); }))
-            , hopper_actuator_info(this->create_subscription<TalonInfo>(
+            , hopper_actuator_sub(this->create_subscription<TalonInfo>(
                 "hopper_info", 10, [this](const TalonInfo &msg)
                 { update_info(msg, 4); }))
             // Robot Status Publisher
             , robot_status_pub(this->create_publisher<std_msgs::msg::Int8>(
                 "robot_status", 10))
+            // Info Plot Init's
+            , test()
             // Motor Info Class init's
             , right_track(BUFFER_SIZE)
             , left_track(BUFFER_SIZE)
@@ -139,7 +142,7 @@ class Application : public rclcpp::Node {
 
             // Robot Status
             {
-                ImGui::SetNextWindowPos(ImVec2(0, 400), ImGuiCond_Always);
+                ImGui::SetNextWindowPos(ImVec2(0, 700), ImGuiCond_Always);
                 ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_Always);
                 ImGui::Begin("Robot Status Control", nullptr, 
                     ImGuiWindowFlags_NoResize | 
@@ -174,7 +177,6 @@ class Application : public rclcpp::Node {
 
             // Motor Info Status's
             {
-                RCLCPP_DEBUG(this->get_logger(), "Starting plot panel");
                 ImGui::SetNextWindowPos(ImVec2(300, 0), ImGuiCond_Always);
                 ImGui::SetNextWindowSize(ImVec2(500, 350), ImGuiCond_Always);
                 ImGui::Begin("Hopper Actuator Info Plot", nullptr,
@@ -221,9 +223,9 @@ class Application : public rclcpp::Node {
                 }   
 
                 ImGui::End();
-
-                RCLCPP_DEBUG(this->get_logger(), "Finished plot panel");
             }
+
+            test.Render();
 
             ImGui::Render();
             SDL_RenderClear(rend);
@@ -240,19 +242,18 @@ class Application : public rclcpp::Node {
         void update_info(const TalonInfo &msg, const int id) {
             switch(id) {
                 case 0:
-                    // right_track.add_message(msg);
+                    right_track.add_point(msg);
                     break;
                 case 1:
-                    // left_track.add_message(msg);
+                    left_track.add_point(msg);
                     break;
                 case 2:
-                    // trencher.add_message(msg);
+                    trencher.add_point(msg);
                     break;
                 case 3:
-                    // hopper_belt.add_message(msg);
+                    hopper_belt.add_point(msg);
                     break;
                 case 4:
-                    // hopper_actuator.add_message(msg);
                     hopper_actuator.add_point(msg);
                     break;
             }
@@ -275,18 +276,19 @@ class Application : public rclcpp::Node {
         std::vector<BASE_COLORS> toggle_cols = {BASE_COLORS::BLUE, BASE_COLORS::RED, BASE_COLORS::GREEN};
         MultiToggle status_toggle;
 
-    // Motor Status Info (ImGui/ImPlot)
-    private:
-
     // Publisher and Subscriber Nodes
     private:
-        rclcpp::Subscription<TalonInfo>::SharedPtr track_right_info;
-        rclcpp::Subscription<TalonInfo>::SharedPtr track_left_info;
-        rclcpp::Subscription<TalonInfo>::SharedPtr trencher_info;
-        rclcpp::Subscription<TalonInfo>::SharedPtr hopper_belt_info;
-        rclcpp::Subscription<TalonInfo>::SharedPtr hopper_actuator_info;
+        rclcpp::Subscription<TalonInfo>::SharedPtr track_right_sub;
+        rclcpp::Subscription<TalonInfo>::SharedPtr track_left_sub;
+        rclcpp::Subscription<TalonInfo>::SharedPtr trencher_sub;
+        rclcpp::Subscription<TalonInfo>::SharedPtr hopper_belt_sub;
+        rclcpp::Subscription<TalonInfo>::SharedPtr hopper_actuator_sub;
 
         rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr robot_status_pub;    
+
+    // Motor Status Info (ImGui/ImPlot)
+    private:
+        InfoPlot test;
 
     // Motor Data classes
     private:

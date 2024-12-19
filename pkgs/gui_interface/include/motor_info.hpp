@@ -12,7 +12,8 @@ using std::vector;
 
 class MotorInfo {
     public:
-        MotorInfo(int max = 1000) : offset(0), time(0.000) {
+        MotorInfo(int max = 1000) : offset(0), time(0.000), ave_temp(0), ave_out_perc(0)
+                                  , ave_out_volt(0), ave_out_curr(0), ave_velocity(0) {
             max_size = max;
             temp.reserve(max_size);
             bus_volt.reserve(max_size);
@@ -45,6 +46,8 @@ class MotorInfo {
             }
 
             time += 0.100;
+
+            moving_average();
         }
 
         void Erase() {
@@ -52,6 +55,30 @@ class MotorInfo {
                 temp.shrink(0);
                 offset = 0;
             }
+        }
+
+    private:
+        void moving_average() {
+
+            float temp_total     = 0;
+            float out_perc_total = 0;
+            float out_volt_total = 0;
+            float out_curr_total = 0;
+            float velocity_total = 0;
+
+            for (int i = 0; i < temp.size(); i++) {
+                temp_total      += temp[i].y;
+                out_perc_total  += out_perc[i].y;
+                out_volt_total  += out_volt[i].y;
+                out_curr_total  += out_curr[i].y;
+                velocity_total  += velocity[i].y;
+            }
+
+            ave_temp     = temp_total / temp.size();
+            ave_out_perc = out_perc_total / out_perc.size();
+            ave_out_volt = out_volt_total / out_volt.size();
+            ave_out_curr = out_curr_total / out_curr.size();
+            ave_velocity = velocity_total / velocity.size();
         }
 
     public:
@@ -69,6 +96,10 @@ class MotorInfo {
         ImVector<ImVec2> position;
         ImVector<ImVec2> velocity;
         
+    private:
+        float ave_temp, ave_out_perc, ave_out_volt, 
+              ave_out_curr, ave_velocity;
+
 };
 
 #endif
