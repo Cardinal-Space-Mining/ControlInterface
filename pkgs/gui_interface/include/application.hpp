@@ -25,8 +25,10 @@
 #include "info_plot.hpp"
 
 using std::vector;
+using std::shared_ptr;
 using namespace std::chrono_literals;
 using namespace custom_types::msg;
+using Info = shared_ptr<MotorInfo>;
 
 #define WIDTH 1200
 #define HEIGHT 900
@@ -40,16 +42,16 @@ class Application : public rclcpp::Node {
             , rend(SDL_CreateRenderer(wind, -1, SDL_RENDERER_ACCELERATED))
             // Motor info Subscribers
             , track_right_sub(this->create_subscription<TalonInfo>(
-                "track_right_sub", 10, [this](const TalonInfo &msg)
+                "track_right_info", 10, [this](const TalonInfo &msg)
                 { update_info(msg, 0); }))
             , track_left_sub(this->create_subscription<TalonInfo>(
-                "track_left_sub", 10, [this](const TalonInfo &msg)
+                "track_left_info", 10, [this](const TalonInfo &msg)
                 { update_info(msg, 1); }))
             , trencher_sub(this->create_subscription<TalonInfo>(
-                "hopper_info", 10, [this](const TalonInfo &msg)
+                "trencher_info", 10, [this](const TalonInfo &msg)
                 { update_info(msg, 2); }))
             , hopper_belt_sub(this->create_subscription<TalonInfo>(
-                "hopper_belt_sub", 10, [this](const TalonInfo &msg)
+                "hopper_belt_info", 10, [this](const TalonInfo &msg)
                 { update_info(msg, 3); }))
             , hopper_actuator_sub(this->create_subscription<TalonInfo>(
                 "hopper_info", 10, [this](const TalonInfo &msg)
@@ -57,14 +59,14 @@ class Application : public rclcpp::Node {
             // Robot Status Publisher
             , robot_status_pub(this->create_publisher<std_msgs::msg::Int8>(
                 "robot_status", 10))
-            // Info Plot Init's
-            , test()
             // Motor Info Class init's
-            , right_track(BUFFER_SIZE)
-            , left_track(BUFFER_SIZE)
-            , trencher(BUFFER_SIZE)
-            , hopper_belt(BUFFER_SIZE)
-            , hopper_actuator(BUFFER_SIZE)
+            // , right_track(BUFFER_SIZE)
+            // , left_track(BUFFER_SIZE)
+            // , trencher(BUFFER_SIZE)
+            // , hopper_belt(BUFFER_SIZE)
+            // , hopper_actuator(BUFFER_SIZE)
+            // Info Plot init (required)
+            // , plots()
         {
 
             if (!wind) {
@@ -125,7 +127,14 @@ class Application : public rclcpp::Node {
             status_toggle = MultiToggle(&robot_status, status_options, "status_switch", "Status");
             status_toggle.SetColors(toggle_cols);
 
+            right_track     = std::make_shared<MotorInfo>(BUFFER_SIZE);
+            left_track      = std::make_shared<MotorInfo>(BUFFER_SIZE);
+            trencher        = std::make_shared<MotorInfo>(BUFFER_SIZE);
+            hopper_belt     = std::make_shared<MotorInfo>(BUFFER_SIZE);
+            hopper_actuator = std::make_shared<MotorInfo>(BUFFER_SIZE);
 
+            // Info Plots
+            plots = InfoPlot(right_track, left_track, trencher, hopper_belt, hopper_actuator);
         }
 
         void update() {
@@ -133,7 +142,10 @@ class Application : public rclcpp::Node {
             SDL_Event e;
             while (SDL_PollEvent(&e)) {
                 ImGui_ImplSDL2_ProcessEvent(&e);
-                this->handle_event(e);
+
+                if (e.type == SDL_QUIT) {
+                    this->~Application();
+                }
             }
 
             ImGui_ImplSDLRenderer2_NewFrame();
@@ -175,57 +187,57 @@ class Application : public rclcpp::Node {
                 ImGui::End();
             }
 
-            // Motor Info Status's
-            {
-                ImGui::SetNextWindowPos(ImVec2(300, 0), ImGuiCond_Always);
-                ImGui::SetNextWindowSize(ImVec2(500, 350), ImGuiCond_Always);
-                ImGui::Begin("Hopper Actuator Info Plot", nullptr,
-                    ImGuiWindowFlags_NoResize |
-                    ImGuiWindowFlags_NoMouseInputs |
-                    ImGuiWindowFlags_NoCollapse);
+            // // Motor Info Status's
+            // {
+            //     ImGui::SetNextWindowPos(ImVec2(300, 0), ImGuiCond_Always);
+            //     ImGui::SetNextWindowSize(ImVec2(500, 350), ImGuiCond_Always);
+            //     ImGui::Begin("Hopper Actuator Info Plot", nullptr,
+            //         ImGuiWindowFlags_NoResize |
+            //         ImGuiWindowFlags_NoMouseInputs |
+            //         ImGuiWindowFlags_NoCollapse);
                 
-                {
-                    static ImPlotAxisFlags y_flags = ImPlotAxisFlags_NoTickLabels;
-                    static ImPlotAxisFlags x_flags = ImPlotAxisFlags_NoTickLabels;
-                    static float history = 25.0f;
-                    ImPlot::BeginPlot("Hopper Actuator", ImVec2(-1, 150));
-                        ImPlot::SetupAxes(nullptr, nullptr, x_flags, y_flags);
-                        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 120);
-                        ImPlot::SetupAxisLimits(ImAxis_X1, hopper_actuator.time-history, hopper_actuator.time, ImGuiCond_Always);
+            //     // {
+            //     //     static ImPlotAxisFlags y_flags = ImPlotAxisFlags_NoTickLabels;
+            //     //     static ImPlotAxisFlags x_flags = ImPlotAxisFlags_NoTickLabels;
+            //     //     static float history = 25.0f;
+            //     //     ImPlot::BeginPlot("Hopper Actuator", ImVec2(-1, 150));
+            //     //         ImPlot::SetupAxes(nullptr, nullptr, x_flags, y_flags);
+            //     //         ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 120);
+            //     //         ImPlot::SetupAxisLimits(ImAxis_X1, hopper_actuator.time-history, hopper_actuator.time, ImGuiCond_Always);
                         
-                        if (hopper_actuator.temp.size() > 0) {
-                            ImPlot::PlotLine("temperature"
-                                                , &hopper_actuator.temp[0].x
-                                                , &hopper_actuator.temp[0].y
-                                                , hopper_actuator.temp.size()
-                                                , 0
-                                                , hopper_actuator.offset
-                                                , 2*sizeof(float));
-                            ImPlot::PlotLine("voltage"
-                                                , &hopper_actuator.bus_volt[0].x
-                                                , &hopper_actuator.bus_volt[0].y
-                                                , hopper_actuator.bus_volt.size()
-                                                , 0
-                                                , hopper_actuator.offset
-                                                , 2*sizeof(float));
-                            ImPlot::SetNextLineStyle(ImVec4(0.1f, 0.9f, 0.1f, 0.2f), 0.25f);
-                            ImPlot::PlotLine("current"
-                                                , &hopper_actuator.out_curr[0].x
-                                                , &hopper_actuator.out_curr[0].y
-                                                , hopper_actuator.out_curr.size()
-                                                , 0
-                                                , hopper_actuator.offset
-                                                , 2*sizeof(float));
+            //     //         if (hopper_actuator.temp.size() > 0) {
+            //     //             ImPlot::PlotLine("temperature"
+            //     //                                 , &hopper_actuator.temp[0].x
+            //     //                                 , &hopper_actuator.temp[0].y
+            //     //                                 , hopper_actuator.temp.size()
+            //     //                                 , 0
+            //     //                                 , hopper_actuator.offset
+            //     //                                 , 2*sizeof(float));
+            //     //             ImPlot::PlotLine("voltage"
+            //     //                                 , &hopper_actuator.bus_volt[0].x
+            //     //                                 , &hopper_actuator.bus_volt[0].y
+            //     //                                 , hopper_actuator.bus_volt.size()
+            //     //                                 , 0
+            //     //                                 , hopper_actuator.offset
+            //     //                                 , 2*sizeof(float));
+            //     //             ImPlot::SetNextLineStyle(ImVec4(0.1f, 0.9f, 0.1f, 0.2f), 0.25f);
+            //     //             ImPlot::PlotLine("current"
+            //     //                                 , &hopper_actuator.out_curr[0].x
+            //     //                                 , &hopper_actuator.out_curr[0].y
+            //     //                                 , hopper_actuator.out_curr.size()
+            //     //                                 , 0
+            //     //                                 , hopper_actuator.offset
+            //     //                                 , 2*sizeof(float));
                             
-                        }
+            //     //         }
 
-                    ImPlot::EndPlot();
-                }   
+            //     //     ImPlot::EndPlot();
+            //     // }   
 
-                ImGui::End();
-            }
+            //     ImGui::End();
+            // }
 
-            test.Render();
+            plots.Render();
 
             ImGui::Render();
             SDL_RenderClear(rend);
@@ -233,28 +245,22 @@ class Application : public rclcpp::Node {
             SDL_RenderPresent(rend);
         }
 
-        void handle_event(SDL_Event& e) {
-            if (e.type == SDL_QUIT) {
-                this->~Application();
-            }
-        }
-
         void update_info(const TalonInfo &msg, const int id) {
             switch(id) {
                 case 0:
-                    right_track.add_point(msg);
+                    right_track->add_point(msg);
                     break;
                 case 1:
-                    left_track.add_point(msg);
+                    left_track->add_point(msg);
                     break;
                 case 2:
-                    trencher.add_point(msg);
+                    trencher->add_point(msg);
                     break;
                 case 3:
-                    hopper_belt.add_point(msg);
+                    hopper_belt->add_point(msg);
                     break;
                 case 4:
-                    hopper_actuator.add_point(msg);
+                    hopper_actuator->add_point(msg);
                     break;
             }
         }
@@ -288,15 +294,15 @@ class Application : public rclcpp::Node {
 
     // Motor Status Info (ImGui/ImPlot)
     private:
-        InfoPlot test;
+        InfoPlot plots;
 
     // Motor Data classes
     private:
-        MotorInfo right_track;
-        MotorInfo left_track;
-        MotorInfo trencher;
-        MotorInfo hopper_belt;
-        MotorInfo hopper_actuator;
+        Info right_track;
+        Info left_track;
+        Info trencher;
+        Info hopper_belt;
+        Info hopper_actuator;
 
 };
 

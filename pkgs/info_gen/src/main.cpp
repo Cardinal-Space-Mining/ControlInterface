@@ -12,8 +12,10 @@ using namespace custom_types::msg;
 class InfoGen : public rclcpp::Node {
     public:
         InfoGen() : rclcpp::Node("info_gen")
-            , info_pub(this->create_publisher<TalonInfo>(
+            , info_pub_act(this->create_publisher<TalonInfo>(
                 "hopper_info", 10))
+            , info_pub_rt(this->create_publisher<TalonInfo>(
+                "track_right_info", 10))
             , pub_timer(create_wall_timer(100ms, [this]() {
                 this->publish(); }))
         {
@@ -40,12 +42,21 @@ class InfoGen : public rclcpp::Node {
             msg.output_current  = out_curr(gen);
             msg.position        = position(gen);
             msg.velocity        = velocity(gen);
+            info_pub_act->publish(msg);
 
-            info_pub->publish(msg);
+            msg.temperature     = temps(gen);
+            msg.bus_voltage     = bus_volt(gen);
+            msg.output_percent  = out_perc(gen);
+            msg.output_voltage  = out_volt(gen);
+            msg.output_current  = out_curr(gen);
+            msg.position        = position(gen);
+            msg.velocity        = velocity(gen);
+            info_pub_rt->publish(msg);
         }
 
     private:
-        rclcpp::Publisher<TalonInfo>::SharedPtr info_pub;
+        rclcpp::Publisher<TalonInfo>::SharedPtr info_pub_act;
+        rclcpp::Publisher<TalonInfo>::SharedPtr info_pub_rt;
         rclcpp::TimerBase::SharedPtr pub_timer;
 
     private:
