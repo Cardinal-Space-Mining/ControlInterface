@@ -24,14 +24,16 @@ class InfoPlot {
                    , temperature(true), bus_voltage(false)
                    , output_perc(false), output_volt(false)
                    , output_curr(false), velocity(false) 
+                   , history(0)
         {}
 
-        InfoPlot(Info rt, Info lt, Info tren, Info hb, Info ha) 
+        InfoPlot(Info rt, Info lt, Info tren, Info hb, Info ha, int buff) 
                    : right_track(true), left_track(true), trencher(true)
                    , hopper_belt(true), hopper_actuator(true)
                    , temperature(true), bus_voltage(false)
                    , output_perc(false), output_volt(false)
-                   , output_curr(false), velocity(false) 
+                   , output_curr(false), velocity(false)
+                   , history(buff / 10.0) 
         {
             right = rt;
             left = lt;
@@ -50,10 +52,22 @@ class InfoPlot {
             if (output_curr)    active_plots++;
             if (velocity)       active_plots++;
 
-            const int cols = active_plots < 3 ? 1 : 2;
-            const int rows = (active_plots + cols - 1) / cols;
-            const float p_wd = INFO_WIDTH / cols * 0.98f;
-            const float p_ht = INFO_HEIGHT / rows * 0.8f;
+            float p_wd, p_ht;
+
+            if (active_plots <= 2) {        // 2 or less plots
+                p_wd = 880;
+                p_ht = 180;
+            } else if (active_plots == 3) { // 3 plots
+                p_wd = 880;
+                p_ht = 135;
+            } else if (active_plots == 4) { // 4 plots
+                p_wd = 440;
+                p_ht = 180;
+            } else {
+                p_wd = 440;
+                p_ht = 135;
+            }
+
             int p_idx = 0;
             ImVec2 size(p_wd, p_ht);
 
@@ -64,20 +78,12 @@ class InfoPlot {
                             ImGuiWindowFlags_NoResize | 
                             ImGuiWindowFlags_NoFocusOnAppearing |
                             ImGuiWindowFlags_NoBringToFrontOnFocus);
-            
-            static ImPlotAxisFlags y_flags;
-            // static ImPlotAxisFlags x_flags = ImPlotAxisFlags_NoTickLabels;
-            static ImPlotAxisFlags x_flags;
-            // How much of past data shown in seconds (history)
-            static float history = 25.0f;
 
             // Temperature Plot
             {
                 if (temperature) {  
-                    ImVec2 pos((p_idx % cols) * INFO_WIDTH / cols, (p_idx / cols) * INFO_HEIGHT / rows);    
-
-                    ImPlot::BeginPlot("Temperature's", size);
-                        ImPlot::SetupAxes(nullptr, "\u00b0Celcius", x_flags, y_flags);
+                    ImPlot::BeginPlot("Temperature", size);
+                        ImPlot::SetupAxes(nullptr, "\u00b0C", x_flags, y_flags);
                         ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 120);
                         ImPlot::SetupAxisLimits(ImAxis_X1, hop_act->time - history, hop_act->time, ImGuiCond_Always);
 
@@ -87,7 +93,7 @@ class InfoPlot {
                                         , &right->temp[0].x
                                         , &right->temp[0].y
                                         , right->temp.size()
-                                        , 0, hop_act->offset
+                                        , 0, right->offset
                                         , 2 * sizeof(float));
                         }
 
@@ -132,44 +138,349 @@ class InfoPlot {
                         }
 
                     ImPlot::EndPlot();
+
+                    p_idx++;
                 }
+            }
+
+            if (active_plots > 3 && p_idx % 2 == 1) {
+                ImGui::SameLine();
             }
 
             // Bus Voltage Plot
             {
                 if (bus_voltage) {
                     ImPlot::BeginPlot("Bus Voltage", size);
-                        ImPlot::SetupAxes(nullptr, "Voltage", x_flags, y_flags);
-                        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 120);
+                        ImPlot::SetupAxes(nullptr, "V", x_flags, y_flags);
+                        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 30);
                         ImPlot::SetupAxisLimits(ImAxis_X1, hop_act->time - history, hop_act->time, ImGuiCond_Always);
+
+                        if (right_track && right->bus_volt.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[0], 0.25f);
+                            ImPlot::PlotLine("right track"
+                                        , &right->bus_volt[0].x
+                                        , &right->bus_volt[0].y
+                                        , right->bus_volt.size()
+                                        , 0, right->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (left_track && left->bus_volt.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[1], 0.25f);
+                            ImPlot::PlotLine("left track"
+                                        , &left->bus_volt[0].x
+                                        , &left->bus_volt[0].y
+                                        , left->bus_volt.size()
+                                        , 0, left->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (trencher && trench->bus_volt.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[2], 0.25f);
+                            ImPlot::PlotLine("trencher"
+                                        , &trench->bus_volt[0].x
+                                        , &trench->bus_volt[0].y
+                                        , trench->bus_volt.size()
+                                        , 0, trench->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (hopper_belt && hop_belt->bus_volt.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[3], 0.25f);
+                            ImPlot::PlotLine("hopper belt"
+                                        , &hop_belt->bus_volt[0].x
+                                        , &hop_belt->bus_volt[0].y
+                                        , hop_belt->bus_volt.size()
+                                        , 0, hop_belt->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (hopper_actuator && hop_act->bus_volt.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[4], 0.25f);
+                            ImPlot::PlotLine("actuators"
+                                        , &hop_act->bus_volt[0].x
+                                        , &hop_act->bus_volt[0].y
+                                        , hop_act->bus_volt.size()
+                                        , 0, hop_act->offset
+                                        , 2 * sizeof(float));
+                        }
+
                     ImPlot::EndPlot();
                 }
+
+                p_idx++;
+            }
+
+            if (active_plots > 3 && p_idx % 2 == 1) {
+                ImGui::SameLine();
             }
 
             // Output Percent Plot
             {
                 if (output_perc) {
                     ImPlot::BeginPlot("Output Percent", size);
-                        ImPlot::SetupAxes(nullptr, "Output %", x_flags, y_flags);
-                        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 120);
+                        ImPlot::SetupAxes(nullptr, "%", x_flags, y_flags);
+                        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 100);
                         ImPlot::SetupAxisLimits(ImAxis_X1, hop_act->time - history, hop_act->time, ImGuiCond_Always);
+
+                        if (right_track && right->out_perc.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[0], 0.25f);
+                            ImPlot::PlotLine("right track"
+                                        , &right->out_perc[0].x
+                                        , &right->out_perc[0].y
+                                        , right->out_perc.size()
+                                        , 0, right->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (left_track && left->out_perc.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[1], 0.25f);
+                            ImPlot::PlotLine("left track"
+                                        , &left->out_perc[0].x
+                                        , &left->out_perc[0].y
+                                        , left->out_perc.size()
+                                        , 0, left->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (trencher && trench->out_perc.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[2], 0.25f);
+                            ImPlot::PlotLine("trencher"
+                                        , &trench->out_perc[0].x
+                                        , &trench->out_perc[0].y
+                                        , trench->out_perc.size()
+                                        , 0, trench->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (hopper_belt && hop_belt->out_perc.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[3], 0.25f);
+                            ImPlot::PlotLine("hopper belt"
+                                        , &hop_belt->out_perc[0].x
+                                        , &hop_belt->out_perc[0].y
+                                        , hop_belt->out_perc.size()
+                                        , 0, hop_belt->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (hopper_actuator && hop_act->out_perc.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[4], 0.25f);
+                            ImPlot::PlotLine("actuators"
+                                        , &hop_act->out_perc[0].x
+                                        , &hop_act->out_perc[0].y
+                                        , hop_act->out_perc.size()
+                                        , 0, hop_act->offset
+                                        , 2 * sizeof(float));
+                        }
+
                     ImPlot::EndPlot();
+
+                    p_idx++;
                 }
+            }
+
+            if (active_plots > 3 && p_idx % 2 == 1) {
+                ImGui::SameLine();
             }
 
             // Output Voltage Plot
             {
+                if (output_volt) {
+                    ImPlot::BeginPlot("Output Voltage", size);
+                        ImPlot::SetupAxes(nullptr, "V", x_flags, y_flags);
+                        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 30);
+                        ImPlot::SetupAxisLimits(ImAxis_X1, hop_act->time - history, hop_act->time, ImGuiCond_Always);
 
+                        if (right_track && right->out_volt.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[0], 0.25f);
+                            ImPlot::PlotLine("right track"
+                                        , &right->out_volt[0].x
+                                        , &right->out_volt[0].y
+                                        , right->out_volt.size()
+                                        , 0, right->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (left_track && left->out_volt.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[1], 0.25f);
+                            ImPlot::PlotLine("left track"
+                                        , &left->out_volt[0].x
+                                        , &left->out_volt[0].y
+                                        , left->out_volt.size()
+                                        , 0, left->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (trencher && trench->out_volt.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[2], 0.25f);
+                            ImPlot::PlotLine("trencher"
+                                        , &trench->out_volt[0].x
+                                        , &trench->out_volt[0].y
+                                        , trench->out_volt.size()
+                                        , 0, trench->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (hopper_belt && hop_belt->out_volt.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[3], 0.25f);
+                            ImPlot::PlotLine("hopper belt"
+                                        , &hop_belt->out_volt[0].x
+                                        , &hop_belt->out_volt[0].y
+                                        , hop_belt->out_volt.size()
+                                        , 0, hop_belt->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (hopper_actuator && hop_act->out_volt.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[4], 0.25f);
+                            ImPlot::PlotLine("actuators"
+                                        , &hop_act->out_volt[0].x
+                                        , &hop_act->out_volt[0].y
+                                        , hop_act->out_volt.size()
+                                        , 0, hop_act->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                    ImPlot::EndPlot();
+
+                    p_idx++;
+                }
+            }
+
+            if (active_plots > 3 && p_idx % 2 == 1) {
+                ImGui::SameLine();
             }
 
             // Output Current Plot
             {
+                if (output_curr) {
+                    ImPlot::BeginPlot("Output Current", size);
+                        ImPlot::SetupAxes(nullptr, "Current", x_flags, y_flags);
+                        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 120);
+                        ImPlot::SetupAxisLimits(ImAxis_X1, hop_act->time - history, hop_act->time, ImGuiCond_Always);
 
+                        if (right_track && right->out_curr.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[0], 0.25f);
+                            ImPlot::PlotLine("right track"
+                                        , &right->out_curr[0].x
+                                        , &right->out_curr[0].y
+                                        , right->out_curr.size()
+                                        , 0, right->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (left_track && left->out_curr.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[1], 0.25f);
+                            ImPlot::PlotLine("left track"
+                                        , &left->out_curr[0].x
+                                        , &left->out_curr[0].y
+                                        , left->out_curr.size()
+                                        , 0, left->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (trencher && trench->out_curr.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[2], 0.25f);
+                            ImPlot::PlotLine("trencher"
+                                        , &trench->out_curr[0].x
+                                        , &trench->out_curr[0].y
+                                        , trench->out_curr.size()
+                                        , 0, trench->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (hopper_belt && hop_belt->out_curr.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[3], 0.25f);
+                            ImPlot::PlotLine("hopper belt"
+                                        , &hop_belt->out_curr[0].x
+                                        , &hop_belt->out_curr[0].y
+                                        , hop_belt->out_curr.size()
+                                        , 0, hop_belt->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (hopper_actuator && hop_act->out_curr.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[4], 0.25f);
+                            ImPlot::PlotLine("actuators"
+                                        , &hop_act->out_curr[0].x
+                                        , &hop_act->out_curr[0].y
+                                        , hop_act->out_curr.size()
+                                        , 0, hop_act->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                    ImPlot::EndPlot();
+
+                    p_idx++;
+                }
+            }
+
+            if (active_plots > 3 && p_idx % 2 == 1) {
+                ImGui::SameLine();
             }
 
             // Velocity Plot
             {
+                if (velocity) {
+                    ImPlot::BeginPlot("Velocity", size);
+                        ImPlot::SetupAxes(nullptr, "Output rps", x_flags, y_flags);
+                        ImPlot::SetupAxisLimits(ImAxis_Y1, -100, 100);
+                        ImPlot::SetupAxisLimits(ImAxis_X1, hop_act->time - history, hop_act->time, ImGuiCond_Always);
 
+                        if (right_track && right->velocity.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[0], 0.25f);
+                            ImPlot::PlotLine("right track"
+                                        , &right->velocity[0].x
+                                        , &right->velocity[0].y
+                                        , right->velocity.size()
+                                        , 0, right->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (left_track && left->velocity.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[1], 0.25f);
+                            ImPlot::PlotLine("left track"
+                                        , &left->velocity[0].x
+                                        , &left->velocity[0].y
+                                        , left->velocity.size()
+                                        , 0, left->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (trencher && trench->velocity.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[2], 0.25f);
+                            ImPlot::PlotLine("trencher"
+                                        , &trench->velocity[0].x
+                                        , &trench->velocity[0].y
+                                        , trench->velocity.size()
+                                        , 0, trench->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (hopper_belt && hop_belt->velocity.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[3], 0.25f);
+                            ImPlot::PlotLine("hopper belt"
+                                        , &hop_belt->velocity[0].x
+                                        , &hop_belt->velocity[0].y
+                                        , hop_belt->velocity.size()
+                                        , 0, hop_belt->offset
+                                        , 2 * sizeof(float));
+                        }
+
+                        if (hopper_actuator && hop_act->velocity.size() > 0) {
+                            ImPlot::SetNextLineStyle(colors[4], 0.25f);
+                            ImPlot::PlotLine("actuators"
+                                        , &hop_act->velocity[0].x
+                                        , &hop_act->velocity[0].y
+                                        , hop_act->velocity.size()
+                                        , 0, hop_act->offset
+                                        , 2 * sizeof(float));
+                        }
+   
+                    ImPlot::EndPlot();
+
+                    p_idx++;
+                }
             }
             
             ImGui::End();
@@ -187,8 +498,8 @@ class InfoPlot {
                 ImGui::End();
 
                 ImGui::SetNextWindowPos(ImVec2(450, 20), ImGuiCond_Always);
-                ImGui::SetNextWindowSize(ImVec2(150, 200), ImGuiCond_Always);
-                ImGui::Begin("Statistics");
+                ImGui::SetNextWindowSize(ImVec2(150, 170), ImGuiCond_Always);
+                ImGui::Begin("Statistics", nullptr, ImGuiWindowFlags_NoResize);
                     ImGui::Checkbox("Temperature", &temperature);
                     ImGui::Checkbox("Bus Voltage", &bus_voltage);
                     ImGui::Checkbox("Output Percent", &output_perc);
@@ -198,7 +509,6 @@ class InfoPlot {
                 ImGui::End();
             }
         }
-
 
     // Checkbox options for what motors to show
     private:
@@ -234,6 +544,14 @@ class InfoPlot {
         Info trench;
         Info hop_belt;
         Info hop_act;
+
+    private:
+        const static ImPlotAxisFlags y_flags = ImPlotAxisFlags_Lock;
+        const static ImPlotAxisFlags x_flags = ImPlotAxisFlags_NoTickLabels;
+
+        // How much of past data shown in seconds (history)
+        // Note: changing history requireds change in buffer size
+        float history = 60.0f;
 };
 
 #endif

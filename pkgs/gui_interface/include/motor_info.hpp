@@ -96,7 +96,7 @@ class MotorInfo {
         ImVector<ImVec2> position;
         ImVector<ImVec2> velocity;
         
-    private:
+    public:
         float ave_temp, ave_out_perc, ave_out_volt, 
               ave_out_curr, ave_velocity;
 

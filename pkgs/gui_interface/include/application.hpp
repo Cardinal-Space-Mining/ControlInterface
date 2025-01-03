@@ -32,7 +32,7 @@ using Info = shared_ptr<MotorInfo>;
 
 #define WIDTH 1200
 #define HEIGHT 900
-#define BUFFER_SIZE 250
+#define BUFFER_SIZE 600
 
 class Application : public rclcpp::Node {
     public:
@@ -134,7 +134,7 @@ class Application : public rclcpp::Node {
             hopper_actuator = std::make_shared<MotorInfo>(BUFFER_SIZE);
 
             // Info Plots
-            plots = InfoPlot(right_track, left_track, trencher, hopper_belt, hopper_actuator);
+            plots = InfoPlot(right_track, left_track, trencher, hopper_belt, hopper_actuator, BUFFER_SIZE);
         }
 
         void update() {
@@ -177,6 +177,15 @@ class Application : public rclcpp::Node {
                     // Talon SRX - Phoenix 5 Motors
                     {
                         ImGui::Text("Talon SRX - Phoenix 5");
+
+                        ImGui::Text("Hopper Actuator:");
+                        if (hopper_actuator->position.size() > 0) {
+                            ImGui::Text("\tPosition: %.3f", hopper_actuator->position.back().y);
+                        } else {
+                            ImGui::Text("\tPosition: ");
+                        }
+
+                        ImGui::Text("\tAverage Temp: %.2f", hopper_actuator->ave_temp);            
                     }
 
                     // Talon FX - Phoenix 6 Motors
@@ -186,56 +195,6 @@ class Application : public rclcpp::Node {
 
                 ImGui::End();
             }
-
-            // // Motor Info Status's
-            // {
-            //     ImGui::SetNextWindowPos(ImVec2(300, 0), ImGuiCond_Always);
-            //     ImGui::SetNextWindowSize(ImVec2(500, 350), ImGuiCond_Always);
-            //     ImGui::Begin("Hopper Actuator Info Plot", nullptr,
-            //         ImGuiWindowFlags_NoResize |
-            //         ImGuiWindowFlags_NoMouseInputs |
-            //         ImGuiWindowFlags_NoCollapse);
-                
-            //     // {
-            //     //     static ImPlotAxisFlags y_flags = ImPlotAxisFlags_NoTickLabels;
-            //     //     static ImPlotAxisFlags x_flags = ImPlotAxisFlags_NoTickLabels;
-            //     //     static float history = 25.0f;
-            //     //     ImPlot::BeginPlot("Hopper Actuator", ImVec2(-1, 150));
-            //     //         ImPlot::SetupAxes(nullptr, nullptr, x_flags, y_flags);
-            //     //         ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 120);
-            //     //         ImPlot::SetupAxisLimits(ImAxis_X1, hopper_actuator.time-history, hopper_actuator.time, ImGuiCond_Always);
-                        
-            //     //         if (hopper_actuator.temp.size() > 0) {
-            //     //             ImPlot::PlotLine("temperature"
-            //     //                                 , &hopper_actuator.temp[0].x
-            //     //                                 , &hopper_actuator.temp[0].y
-            //     //                                 , hopper_actuator.temp.size()
-            //     //                                 , 0
-            //     //                                 , hopper_actuator.offset
-            //     //                                 , 2*sizeof(float));
-            //     //             ImPlot::PlotLine("voltage"
-            //     //                                 , &hopper_actuator.bus_volt[0].x
-            //     //                                 , &hopper_actuator.bus_volt[0].y
-            //     //                                 , hopper_actuator.bus_volt.size()
-            //     //                                 , 0
-            //     //                                 , hopper_actuator.offset
-            //     //                                 , 2*sizeof(float));
-            //     //             ImPlot::SetNextLineStyle(ImVec4(0.1f, 0.9f, 0.1f, 0.2f), 0.25f);
-            //     //             ImPlot::PlotLine("current"
-            //     //                                 , &hopper_actuator.out_curr[0].x
-            //     //                                 , &hopper_actuator.out_curr[0].y
-            //     //                                 , hopper_actuator.out_curr.size()
-            //     //                                 , 0
-            //     //                                 , hopper_actuator.offset
-            //     //                                 , 2*sizeof(float));
-                            
-            //     //         }
-
-            //     //     ImPlot::EndPlot();
-            //     // }   
-
-            //     ImGui::End();
-            // }
 
             plots.Render();
 
