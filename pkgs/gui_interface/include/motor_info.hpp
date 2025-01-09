@@ -10,8 +10,24 @@
 using namespace custom_types::msg;
 using std::vector;
 
+/*
+ * Stores and updates motor information. Can be used as a rolling graph.
+ * 
+ * The `max_size` parameter can be used to adjust how many data points are stored
+ * before erasing the front and adding to the back. This should be calculated
+ * based on the how long (history) of points shown and how often data is expected
+ * (i.e. a history of 30 seconds and data every 10th of a second would be a buffer
+ * of 300 or a max size of 300).
+ * 
+ * Moving average calculations are included, will be recalculated upon each new data
+ * point collected. Calculation: moving average = total / max_size (this should be
+ * adjusted to reduce runtime)  
+*/
 class MotorInfo {
     public:
+        /*
+         * Constructor for the MotorInfo class.
+         */
         MotorInfo(int max = 1000) : offset(0), time(0.000), ave_temp(0), ave_out_perc(0)
                                   , ave_out_volt(0), ave_out_curr(0), ave_velocity(0) {
             max_size = max;
@@ -24,6 +40,11 @@ class MotorInfo {
             velocity.reserve(max_size);
         }
 
+        /*
+         * Adds new data point if size is under max_size or replaces data
+         * at offset increasing the offset value. Offset will reset when
+         * the max_size has been reached.
+         */
         void add_point(const TalonInfo &msg) {
             if (temp.size() < max_size) {
                 temp.push_back(ImVec2(time, msg.temperature));
@@ -50,6 +71,9 @@ class MotorInfo {
             moving_average();
         }
 
+        /*
+         * Simple function to erase used memory in vectors. 
+         */
         void Erase() {
             if (temp.size() > 0) {
                 temp.shrink(0);
@@ -58,6 +82,9 @@ class MotorInfo {
         }
 
     private:
+        /*
+         * Calculates moving averages based on current data points. 
+         */
         void moving_average() {
 
             float temp_total     = 0;

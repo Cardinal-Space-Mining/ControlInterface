@@ -31,16 +31,17 @@ using namespace std::chrono_literals;
 using namespace custom_types::msg;
 using Info = shared_ptr<MotorInfo>;
 
-#define WIDTH 1200
-#define HEIGHT 900
+#define WIDTH 1920
+#define HEIGHT 1080
 #define BUFFER_SIZE 600
 
 class Application : public rclcpp::Node {
     public:
         Application() : rclcpp::Node("control_gui") 
             , wind(SDL_CreateWindow("Mission Control GUI", SDL_WINDOWPOS_CENTERED,
-                                    SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL))
+                                    SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE))
             , rend(SDL_CreateRenderer(wind, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC))
+            , status_toggle()
             // Motor info Subscribers
             , track_right_sub(this->create_subscription<TalonInfo>(
                 "track_right_info", 10, [this](const TalonInfo &msg)
@@ -60,7 +61,6 @@ class Application : public rclcpp::Node {
             // Robot Status Publisher
             , robot_status_pub(this->create_publisher<std_msgs::msg::Int8>(
                 "robot_status", 10))
-            , status_toggle()
             , image_sub(this->create_subscription<sensor_msgs::msg::Image>(
                 "camera/image_raw", 10, [this](const sensor_msgs::msg::Image &msg)
                 { 
@@ -163,7 +163,7 @@ class Application : public rclcpp::Node {
                 ImGui::SetNextWindowPos(ImVec2(0, 700), ImGuiCond_Always);
                 ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_Always);
                 ImGui::Begin("Robot Status Control", nullptr, 
-                    ImGuiWindowFlags_NoResize | 
+                    // ImGuiWindowFlags_NoResize | 
                     ImGuiWindowFlags_NoMove | 
                     ImGuiWindowFlags_NoCollapse);
 
@@ -273,8 +273,8 @@ class Application : public rclcpp::Node {
                 uint8_t* dst = static_cast<uint8_t*>(pixels);
                 const uint8_t* src = msg.data.data();
 
-                for (int y = 0; y < cam_height; ++y) {
-                    for (int x = 0; x < cam_width; ++x) {
+                for (unsigned int y = 0; y < cam_height; ++y) {
+                    for (unsigned int x = 0; x < cam_width; ++x) {
                         int idx = y * pitch + x * 3;
                         dst[idx + 0] = src[y * cam_width * 3 + x * 3 + 2];
                         dst[idx + 1] = src[y * cam_width * 3 + x * 3 + 1];
@@ -292,7 +292,6 @@ class Application : public rclcpp::Node {
     private:
         SDL_Window* wind;
         SDL_Renderer* rend;
-        SDL_GLContext glcontext;
 
     // Timer base
     private:
@@ -326,13 +325,13 @@ class Application : public rclcpp::Node {
         Info left_track;
         Info trencher;
         Info hopper_belt;
-        Info hopper_actuator;
+        Info hopper_actuator; 
 
     private:
         rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub;
         SDL_Texture* video_tex = SDL_CreateTexture(rend, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, cam_width, cam_height);
-        int cam_width;
-        int cam_height;
+        unsigned int cam_width;
+        unsigned int cam_height;
 };
 
 #endif
