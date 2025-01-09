@@ -6,6 +6,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/int8.hpp>
+#include <sensor_msgs/msg/image.hpp>
 
 #include "custom_types/msg/talon_info.hpp"
 
@@ -38,8 +39,8 @@ class Application : public rclcpp::Node {
     public:
         Application() : rclcpp::Node("control_gui") 
             , wind(SDL_CreateWindow("Mission Control GUI", SDL_WINDOWPOS_CENTERED,
-                                    SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE))
-            , rend(SDL_CreateRenderer(wind, -1, SDL_RENDERER_ACCELERATED))
+                                    SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL))
+            , rend(SDL_CreateRenderer(wind, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC))
             // Motor info Subscribers
             , track_right_sub(this->create_subscription<TalonInfo>(
                 "track_right_info", 10, [this](const TalonInfo &msg)
@@ -59,21 +60,27 @@ class Application : public rclcpp::Node {
             // Robot Status Publisher
             , robot_status_pub(this->create_publisher<std_msgs::msg::Int8>(
                 "robot_status", 10))
-            // Motor Info Class init's
-            // , right_track(BUFFER_SIZE)
-            // , left_track(BUFFER_SIZE)
-            // , trencher(BUFFER_SIZE)
-            // , hopper_belt(BUFFER_SIZE)
-            // , hopper_actuator(BUFFER_SIZE)
-            // Info Plot init (required)
-            // , plots()
+            , status_toggle()
+            , image_sub(this->create_subscription<sensor_msgs::msg::Image>(
+                "camera/image_raw", 10, [this](const sensor_msgs::msg::Image &msg)
+                { 
+                    if (msg.encoding != "bgr8") {
+                        RCLCPP_ERROR(this->get_logger(), "Unsupported encoding: %s", msg.encoding.c_str());
+                    }
+                    this->imageCallback(msg);
+                    // RCLCPP_INFO(this->get_logger(), "\rReceived an image!");
+                }))
+            , cam_width(640)
+            , cam_height(480)
         {
 
             if (!wind) {
                 RCLCPP_ERROR(this->get_logger(), "Could not create SDL Window");
+                return;
             }
             if (!rend) {
                 RCLCPP_ERROR(this->get_logger(), "Could not create SDL Renderer");
+                return;
             }
 
             // Initialize ImGui
@@ -108,16 +115,13 @@ class Application : public rclcpp::Node {
         }
 
         ~Application() {
+            if (video_tex) SDL_DestroyTexture(video_tex);
             ImGui_ImplSDLRenderer2_Shutdown();
             ImGui_ImplSDL2_Shutdown();
-            ImGui::DestroyContext();
             ImPlot::DestroyContext();
-            if (rend) {
-                SDL_DestroyRenderer(rend);
-            }
-            if (wind) {
-                SDL_DestroyWindow(wind);
-            }
+            ImGui::DestroyContext();
+            if (rend) SDL_DestroyRenderer(rend);
+            if (wind) SDL_DestroyWindow(wind);
             SDL_Quit();
         }
 
@@ -145,6 +149,8 @@ class Application : public rclcpp::Node {
 
                 if (e.type == SDL_QUIT) {
                     this->~Application();
+                    // rclcpp::shutdown();
+                    return;
                 }
             }
 
@@ -196,9 +202,22 @@ class Application : public rclcpp::Node {
                 ImGui::End();
             }
 
-            plots.Render();
+            // Motor Data plots
+            {
+                plots.Render();
+            }
+
+            // Camera feed
+            {
+                ImGui::SetNextWindowPos(ImVec2(300, 450), ImGuiCond_Always);
+                ImGui::SetNextWindowSize(ImVec2(900, 450), ImGuiCond_Always);
+                ImGui::Begin("Video Display");
+                    ImGui::Image((ImTextureID) video_tex, ImVec2(cam_width, cam_height));
+                ImGui::End();
+            }
 
             ImGui::Render();
+            SDL_SetRenderDrawColor(rend, 0, 0, 0, 255);
             SDL_RenderClear(rend);
             ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), rend);
             SDL_RenderPresent(rend);
@@ -224,10 +243,56 @@ class Application : public rclcpp::Node {
             }
         }
 
+        void imageCallback(const sensor_msgs::msg::Image &msg) {
+            if (!video_tex || msg.width != cam_width || msg.height != cam_height) {
+
+                RCLCPP_DEBUG(this->get_logger(), "first if conditional");
+
+                cam_width = msg.width;
+                cam_height = msg.height;
+
+                if (video_tex) {
+                    SDL_DestroyTexture(video_tex);
+                }
+
+                video_tex = SDL_CreateTexture(
+                    rend,
+                    SDL_PIXELFORMAT_RGB24,
+                    SDL_TEXTUREACCESS_STREAMING,
+                    cam_width, cam_height);
+
+                if (!video_tex) {
+                    RCLCPP_ERROR(this->get_logger(), "Failed to create SDL Texture for live video");
+                    return;
+                }
+            }
+
+            void* pixels;
+            int pitch;
+            if (SDL_LockTexture(video_tex, nullptr, &pixels, &pitch) == 0) {
+                uint8_t* dst = static_cast<uint8_t*>(pixels);
+                const uint8_t* src = msg.data.data();
+
+                for (int y = 0; y < cam_height; ++y) {
+                    for (int x = 0; x < cam_width; ++x) {
+                        int idx = y * pitch + x * 3;
+                        dst[idx + 0] = src[y * cam_width * 3 + x * 3 + 2];
+                        dst[idx + 1] = src[y * cam_width * 3 + x * 3 + 1];
+                        dst[idx + 2] = src[y * cam_width * 3 + x * 3 + 0];
+                    }
+                }
+
+                SDL_UnlockTexture(video_tex);
+            } else {
+                RCLCPP_ERROR(this->get_logger(), "Failed to lock SDL texture");
+            }
+        }
+
     // SDL and ImGui Storing and Configs
     private:
         SDL_Window* wind;
         SDL_Renderer* rend;
+        SDL_GLContext glcontext;
 
     // Timer base
     private:
@@ -263,6 +328,11 @@ class Application : public rclcpp::Node {
         Info hopper_belt;
         Info hopper_actuator;
 
+    private:
+        rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub;
+        SDL_Texture* video_tex = SDL_CreateTexture(rend, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, cam_width, cam_height);
+        int cam_width;
+        int cam_height;
 };
 
 #endif
