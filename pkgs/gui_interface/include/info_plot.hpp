@@ -14,7 +14,7 @@ using std::shared_ptr;
 using Info = shared_ptr<MotorInfo>;
 
 #define INFO_WIDTH 900
-#define INFO_HEIGHT 450
+#define INFO_HEIGHT 485
 const float width = 150.0f;
 
 class InfoPlot {
@@ -71,7 +71,7 @@ class InfoPlot {
             int p_idx = 0;
             ImVec2 size(p_wd, p_ht);
 
-            ImGui::SetNextWindowPos(ImVec2(300, 0), ImGuiCond_Always);
+            ImGui::SetNextWindowPos(ImVec2(300, 525), ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImVec2(INFO_WIDTH, INFO_HEIGHT), ImGuiCond_Always);
             ImGui::Begin("Real-time Motor Information", nullptr, 
                             ImGuiWindowFlags_NoCollapse | 
@@ -487,7 +487,7 @@ class InfoPlot {
 
             // Menus for what to show
             {
-                ImGui::SetNextWindowPos(ImVec2(300, 20), ImGuiCond_Always);
+                ImGui::SetNextWindowPos(ImVec2(300, 545), ImGuiCond_Always);
                 ImGui::SetNextWindowSize(ImVec2(150, 150), ImGuiCond_Always);
                 ImGui::Begin("Motors", nullptr, ImGuiWindowFlags_NoResize);
                     ImGui::Checkbox("Right Track", &right_track);
@@ -497,7 +497,7 @@ class InfoPlot {
                     ImGui::Checkbox("Hopper Actuator", &hopper_actuator);
                 ImGui::End();
 
-                ImGui::SetNextWindowPos(ImVec2(450, 20), ImGuiCond_Always);
+                ImGui::SetNextWindowPos(ImVec2(450, 545), ImGuiCond_Always);
                 ImGui::SetNextWindowSize(ImVec2(150, 170), ImGuiCond_Always);
                 ImGui::Begin("Statistics", nullptr, ImGuiWindowFlags_NoResize);
                     ImGui::Checkbox("Temperature", &temperature);

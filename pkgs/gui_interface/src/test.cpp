@@ -30,7 +30,6 @@ int main(int argc, char* argv[]) {
 
     auto node = make_shared<Application>();
     rclcpp::spin(node);
-    rclcpp::shutdown();
 
     node = nullptr;
 

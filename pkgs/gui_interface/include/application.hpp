@@ -7,6 +7,15 @@
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/int8.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <cv_bridge/cv_bridge.hpp>
+#include <opencv2/opencv.hpp>
+
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl/conversions.h>
+#include <pcl/point_types_conversion.h>
 
 #include "custom_types/msg/talon_info.hpp"
 
@@ -61,17 +70,27 @@ class Application : public rclcpp::Node {
             // Robot Status Publisher
             , robot_status_pub(this->create_publisher<std_msgs::msg::Int8>(
                 "robot_status", 10))
-            , image_sub(this->create_subscription<sensor_msgs::msg::Image>(
-                "camera/image_raw", 10, [this](const sensor_msgs::msg::Image &msg)
-                { 
-                    if (msg.encoding != "bgr8") {
-                        RCLCPP_ERROR(this->get_logger(), "Unsupported encoding: %s", msg.encoding.c_str());
+            // Live feed camera feed
+            , image_sub(this->create_subscription<sensor_msgs::msg::CompressedImage>(
+                "camera/image_compressed", 10, [this](const sensor_msgs::msg::CompressedImage &msg)
+                {
+                    if (msg.format != "jpg") {
+                        RCLCPP_ERROR(this->get_logger(), "Unsupported encoding: %s", msg.format.c_str());
                     }
                     this->imageCallback(msg);
-                    // RCLCPP_INFO(this->get_logger(), "\rReceived an image!");
                 }))
+            , camera_selection(this->create_publisher<std_msgs::msg::Int8>(
+                "camera_select", 10))
             , cam_width(640)
             , cam_height(480)
+            , current_camera(4)
+            , last_camera(4)
+            // 3D Point Cloud Map
+            , pcl_map_sub(this->create_subscription<sensor_msgs::msg::PointCloud2>(
+                "lidarmap_chunk", 10, [this](const sensor_msgs::msg::PointCloud2 &msg)
+                { 
+                    this->pclCallback(msg);
+                }))
         {
 
             if (!wind) {
@@ -115,13 +134,13 @@ class Application : public rclcpp::Node {
         }
 
         ~Application() {
-            if (video_tex) SDL_DestroyTexture(video_tex);
+            if (video_tex) { SDL_DestroyTexture(video_tex); }
             ImGui_ImplSDLRenderer2_Shutdown();
             ImGui_ImplSDL2_Shutdown();
             ImPlot::DestroyContext();
             ImGui::DestroyContext();
-            if (rend) SDL_DestroyRenderer(rend);
-            if (wind) SDL_DestroyWindow(wind);
+            if (rend) { SDL_DestroyRenderer(rend); }
+            if (wind) { SDL_DestroyWindow(wind); }
             SDL_Quit();
         }
 
@@ -149,7 +168,7 @@ class Application : public rclcpp::Node {
 
                 if (e.type == SDL_QUIT) {
                     this->~Application();
-                    // rclcpp::shutdown();
+                    rclcpp::shutdown();
                     return;
                 }
             }
@@ -161,13 +180,23 @@ class Application : public rclcpp::Node {
             // Robot Status
             {
                 ImGui::SetNextWindowPos(ImVec2(0, 700), ImGuiCond_Always);
-                ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_Always);
+                ImGui::SetNextWindowSize(ImVec2(300, 380), ImGuiCond_Always);
                 ImGui::Begin("Robot Status Control", nullptr, 
-                    // ImGuiWindowFlags_NoResize | 
+                    ImGuiWindowFlags_NoResize | 
                     ImGuiWindowFlags_NoMove | 
                     ImGuiWindowFlags_NoCollapse);
 
+                    int last_state = robot_status;
                     status_toggle.Render();
+
+                    if (last_state != robot_status) {
+                        auto msg = std_msgs::msg::Int8();
+                        msg.data = robot_status;
+                        robot_status_pub->publish(msg);
+                        
+                        RCLCPP_INFO(this->get_logger(), "Robot status changed to: %d", robot_status);
+                    }
+
                 ImGui::End();
             }
 
@@ -197,6 +226,18 @@ class Application : public rclcpp::Node {
                     // Talon FX - Phoenix 6 Motors
                     {
                         ImGui::Text("Talon FX - Phoenix 6");
+
+                        ImGui::Text("Right Track:");
+                        ImGui::Text("\tAverage Temp: %.2f", right_track->ave_temp);
+
+                        ImGui::Text("Left Track:");
+                        ImGui::Text("\tAverage Temp: %.2f", left_track->ave_temp);
+
+                        ImGui::Text("Trencher:");
+                        ImGui::Text("\tAverage Temp: %.2f", trencher->ave_temp);
+
+                        ImGui::Text("Hopper Belt:");
+                        ImGui::Text("\tAverage Temp: %.2f", hopper_belt->ave_temp);
                     }
 
                 ImGui::End();
@@ -209,10 +250,57 @@ class Application : public rclcpp::Node {
 
             // Camera feed
             {
-                ImGui::SetNextWindowPos(ImVec2(300, 450), ImGuiCond_Always);
-                ImGui::SetNextWindowSize(ImVec2(900, 450), ImGuiCond_Always);
-                ImGui::Begin("Video Display");
+                ImGui::SetNextWindowPos(ImVec2(300, 0), ImGuiCond_Always);
+                ImGui::SetNextWindowSize(ImVec2(900, 525), ImGuiCond_Always);
+                ImGui::Begin("Video Display", nullptr,
+                            ImGuiWindowFlags_NoCollapse | 
+                            ImGuiWindowFlags_NoResize | 
+                            ImGuiWindowFlags_NoFocusOnAppearing |
+                            ImGuiWindowFlags_NoBringToFrontOnFocus);
+
                     ImGui::Image((ImTextureID) video_tex, ImVec2(cam_width, cam_height));
+                ImGui::End();
+
+                // Menu to select which camera is being viewed (if viewing feed).
+                // Will turn on and off publisher on robot to reduce traffic
+                {
+                    ImGui::SetNextWindowPos(ImVec2(955, 27), ImGuiCond_Always);
+                    ImGui::SetNextWindowSize(ImVec2(240, 480), ImGuiCond_Always);
+                    ImGui::Begin("Camera Feed Selection", nullptr,
+                                ImGuiWindowFlags_NoResize);
+
+                        for (int i = 0; i < (int) camera_options.size(); i++) {
+                            if (ImGui::RadioButton(camera_options[i].c_str(), current_camera == i)) {
+                                current_camera = i;
+                                if (current_camera != last_camera) {
+                                    last_camera = current_camera;
+
+                                    // publish camera selection
+                                    auto msg = std_msgs::msg::Int8();
+                                    msg.data = static_cast<int8_t>(current_camera);
+                                    camera_selection->publish(msg);
+
+                                    RCLCPP_INFO(this->get_logger(), "changing states to: %d", current_camera);
+                                }
+                            }
+                        }
+
+                        ImGui::Text("Selected Camera: %s", camera_options[current_camera].c_str());                  
+                    ImGui::End();
+                }
+            }
+
+            // Point Cloud Map
+            {
+                ImGui::SetNextWindowSize(ImVec2(900, 900), ImGuiCond_Always);
+                ImGui::Begin("LiDAR Map", nullptr,
+                            ImGuiWindowFlags_NoCollapse |
+                            ImGuiWindowFlags_NoResize
+                            // ImGuiWindowFlags_NoFocusOnAppearing |
+                            // ImGuiWindowFlags_NoBringToFrontOnFocus
+                            );
+
+                    ImGui::Image((ImTextureID) pcl_tex, ImVec2(cam_width, cam_height));
                 ImGui::End();
             }
 
@@ -243,27 +331,33 @@ class Application : public rclcpp::Node {
             }
         }
 
-        void imageCallback(const sensor_msgs::msg::Image &msg) {
-            if (!video_tex || msg.width != cam_width || msg.height != cam_height) {
+        void imageCallback(const sensor_msgs::msg::CompressedImage &msg) {
+            cv::Mat frame = cv::imdecode(cv::Mat(msg.data), cv::IMREAD_COLOR);
+            if (!video_tex) {
 
-                RCLCPP_DEBUG(this->get_logger(), "first if conditional");
-
-                cam_width = msg.width;
-                cam_height = msg.height;
-
-                if (video_tex) {
-                    SDL_DestroyTexture(video_tex);
+                if (frame.empty()) {
+                    RCLCPP_ERROR(this->get_logger(), "Failed to decode compressed image");
+                    return;
                 }
 
-                video_tex = SDL_CreateTexture(
-                    rend,
-                    SDL_PIXELFORMAT_RGB24,
-                    SDL_TEXTUREACCESS_STREAMING,
-                    cam_width, cam_height);
+                if (!video_tex || frame.cols != cam_width || frame.rows != cam_height) {
+                    cam_width = frame.cols;
+                    cam_height = frame.rows;
 
-                if (!video_tex) {
-                    RCLCPP_ERROR(this->get_logger(), "Failed to create SDL Texture for live video");
-                    return;
+                    if (video_tex) {
+                        SDL_DestroyTexture(video_tex);
+                    }
+
+                    video_tex = SDL_CreateTexture(
+                        rend,
+                        SDL_PIXELFORMAT_BGR24,
+                        SDL_TEXTUREACCESS_STREAMING,
+                        cam_width, cam_height);
+
+                    if (!video_tex) {
+                        RCLCPP_ERROR(this->get_logger(), "Failed to create SDL Texture for live camera");
+                        return;
+                    }
                 }
             }
 
@@ -271,20 +365,102 @@ class Application : public rclcpp::Node {
             int pitch;
             if (SDL_LockTexture(video_tex, nullptr, &pixels, &pitch) == 0) {
                 uint8_t* dst = static_cast<uint8_t*>(pixels);
-                const uint8_t* src = msg.data.data();
-
-                for (unsigned int y = 0; y < cam_height; ++y) {
-                    for (unsigned int x = 0; x < cam_width; ++x) {
+                for (int y = 0; y < cam_height; ++y) {
+                    for (int x = 0; x < cam_width; ++x) {
                         int idx = y * pitch + x * 3;
-                        dst[idx + 0] = src[y * cam_width * 3 + x * 3 + 2];
-                        dst[idx + 1] = src[y * cam_width * 3 + x * 3 + 1];
-                        dst[idx + 2] = src[y * cam_width * 3 + x * 3 + 0];
+                        dst[idx + 0] = frame.at<cv::Vec3b>(y, x)[2]; // R
+                        dst[idx + 1] = frame.at<cv::Vec3b>(y, x)[1]; // G
+                        dst[idx + 2] = frame.at<cv::Vec3b>(y, x)[0]; // B
                     }
                 }
-
                 SDL_UnlockTexture(video_tex);
             } else {
                 RCLCPP_ERROR(this->get_logger(), "Failed to lock SDL texture");
+            }
+        }
+
+        void pcl2ToPCL(const sensor_msgs::msg::PointCloud2 &msg, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud) {
+            // clear cloud
+            cloud->clear();
+
+            // get the point cloud data from message
+            pcl::PointCloud<pcl::PointXYZ> tmp_cloud;
+            tmp_cloud.width = msg.width;
+            tmp_cloud.height = msg.height;
+            tmp_cloud.is_dense = msg.is_dense;
+            tmp_cloud.points.resize(msg.data.size() / msg.point_step);
+
+            // iterate through message and extract points
+            const uint8_t* ptr = &msg.data[0];
+            for (size_t i = 0; i < tmp_cloud.points.size(); ++i, ptr += msg.point_step) {
+                float x = *reinterpret_cast<const float*>(ptr + msg.fields[0].offset);
+                float y = *reinterpret_cast<const float*>(ptr + msg.fields[1].offset);
+                float z = *reinterpret_cast<const float*>(ptr + msg.fields[2].offset);
+
+                tmp_cloud.points[i].x = x;
+                tmp_cloud.points[i].y = y;
+                tmp_cloud.points[i].z = z;
+            }
+
+            *cloud = tmp_cloud;
+        }
+
+        void pclCallback(const sensor_msgs::msg::PointCloud2 &msg) {
+            pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
+
+            pcl2ToPCL(msg, cloud);
+
+            if (!pcl_tex) {
+                cam_width = 800;
+                cam_height = 600;
+
+                pcl_tex = SDL_CreateTexture(
+                    rend,
+                    SDL_PIXELFORMAT_RGBA8888,
+                    SDL_TEXTUREACCESS_STREAMING,
+                    cam_width, cam_height);
+
+                if (!pcl_tex) {
+                    RCLCPP_ERROR(this->get_logger(), "Failed to create SDL Texture for point cloud");
+                    return;
+                }
+            }
+
+            // blank framebuffer
+            std::vector<uint32_t> frame_buffer(cam_width * cam_height, 0x00000000); // black
+
+            // project 3d in 2d space
+            for (const auto& point : cloud->points) {
+                if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z)) {
+                    continue;
+                }
+
+                // perspective projection
+                float fov = 90.0f;
+                float aspect = static_cast<float>(cam_width) / cam_height;
+                float focal_len = 1.0f / tan((fov * 0.5f) * M_PI / 180.0f);
+
+                // transform the point (basic ex: no rotation)
+                float screen_x = (point.x / -point.z) * focal_len * cam_width / aspect + cam_width / 2;
+                float screen_y = (point.y / -point.z) * focal_len * cam_height / aspect + cam_height / 2;
+
+                // map to framebuffer (clip to screen dimensions)
+                int pixel_x = static_cast<int>(screen_x);
+                int pixel_y = static_cast<int>(screen_y);
+
+                if (pixel_x >= 0 && pixel_x < cam_width && pixel_y >= 0 && pixel_y < cam_height) {
+                    frame_buffer[pixel_y * cam_width + pixel_x] = 0xFFFFFF00; 
+                }
+            }
+
+            // update SDL texture
+            void* pixels;
+            int pitch;
+            if (SDL_LockTexture(pcl_tex, nullptr, &pixels, &pitch) == 0) {
+                memcpy(pixels, frame_buffer.data(), cam_width * cam_height * sizeof(uint32_t));
+                SDL_UnlockTexture(pcl_tex);
+            } else {
+                RCLCPP_ERROR(this->get_logger(), "Failed to lock SDL texture (pcl)");
             }
         }
 
@@ -327,11 +503,22 @@ class Application : public rclcpp::Node {
         Info hopper_belt;
         Info hopper_actuator; 
 
+    // Camera Feed
     private:
-        rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub;
+        rclcpp::Subscription<sensor_msgs::msg::CompressedImage>::SharedPtr image_sub;
+        rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr camera_selection;
         SDL_Texture* video_tex = SDL_CreateTexture(rend, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, cam_width, cam_height);
-        unsigned int cam_width;
-        unsigned int cam_height;
+        int cam_width;
+        int cam_height;
+        int current_camera;
+        int last_camera;
+        const std::vector<std::string> camera_options = {"Front Camera", "Rear Camera", "Left Camera", "Right Camera", "No Camera"};
+
+    // 3D Lidar Point Cloud
+    private:
+        rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_map_sub;
+        SDL_Texture* pcl_tex = SDL_CreateTexture(rend, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 800, 600);
+
 };
 
 #endif
