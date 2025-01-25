@@ -11,6 +11,7 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(custom_types REQUIRED)
+find_package(pcl_ros REQUIRED)
 
 # for ros video
 find_package(cv_bridge REQUIRED)
