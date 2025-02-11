@@ -16,7 +16,7 @@ class CamPub : public rclcpp::Node {
 
             timer_ = this->create_wall_timer(
                 std::chrono::milliseconds(30),
-                std::bind(&CamPub::publish, this));
+                [this](){this->publish();});
         }
 
     private:
