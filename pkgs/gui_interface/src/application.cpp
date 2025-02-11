@@ -141,9 +141,7 @@ void Application::update()
 
         if (e.type == SDL_QUIT)
         {
-            this->~Application(); // TODO
-            rclcpp::shutdown();
-            return;
+            throw std::runtime_error("Goodbye");
         }
     }
 

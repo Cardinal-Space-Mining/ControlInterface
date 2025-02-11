@@ -30,11 +30,15 @@ int main(int argc, char *argv[])
     // Load ROS2
     rclcpp::init(argc, argv);
 
+    try
     {
         auto node = make_shared<Application>();
         rclcpp::spin(node);
     }
-    rclcpp::shutdown();
+    catch (...)
+    {
+        rclcpp::shutdown();
+    }
 
     return 0;
 }

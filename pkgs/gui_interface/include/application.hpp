@@ -40,12 +40,13 @@ using namespace std::chrono_literals;
 using namespace custom_types::msg;
 using Info = shared_ptr<MotorInfo>;
 
-#define WIDTH 1920
-#define HEIGHT 1080
-#define BUFFER_SIZE 600
-
 class Application : public rclcpp::Node
 {
+private:
+    constexpr static int WIDTH{1920};
+    constexpr static int HEIGHT{1080};
+    constexpr static size_t BUFFER_SIZE{600};
+
 public:
     Application();
 
@@ -102,8 +103,8 @@ private:
     // Robot Status Toggle (ImGui)
 private:
     int robot_status = 1;
-    std::vector<std::string> status_options = {"autonomous", "disabled", "teleop"};
-    std::vector<BASE_COLORS> toggle_cols = {BASE_COLORS::BLUE, BASE_COLORS::RED, BASE_COLORS::GREEN};
+    const std::vector<std::string> status_options = {"autonomous", "disabled", "teleop"};
+    const std::vector<BASE_COLORS> toggle_cols = {BASE_COLORS::BLUE, BASE_COLORS::RED, BASE_COLORS::GREEN};
     MultiToggle status_toggle;
 
     // Publisher and Subscriber Nodes
