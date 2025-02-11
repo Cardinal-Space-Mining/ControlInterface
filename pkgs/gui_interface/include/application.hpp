@@ -152,9 +152,11 @@ private:
     // 3D Lidar Point Cloud
 private:
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_map_sub;
+    int lidar_width = 800;
+    int lidar_height = 600;
     SDL_Texture *pcl_tex = [this]()
     {
-        SDL_Texture *pcl_tex_ = SDL_CreateTexture(rend, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 800, 600);
+        SDL_Texture *pcl_tex_ = SDL_CreateTexture(rend, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, lidar_width, lidar_height);
         if (pcl_tex_ == nullptr)
         {
             RCLCPP_ERROR(this->get_logger(), "Count not create SDL_CreateTexture. Error Msg: %s", SDL_GetError());

@@ -279,7 +279,7 @@ void Application::update()
                      // ImGuiWindowFlags_NoBringToFrontOnFocus
         );
 
-        ImGui::Image((ImTextureID)pcl_tex, ImVec2(cam_width, cam_height));
+        ImGui::Image((ImTextureID)pcl_tex, ImVec2(lidar_width, lidar_height));
         ImGui::End();
     }
 
@@ -407,14 +407,11 @@ void Application::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
 
     if (!pcl_tex)
     {
-        cam_width = 800;
-        cam_height = 600;
-
         pcl_tex = SDL_CreateTexture(
             rend,
             SDL_PIXELFORMAT_RGBA8888,
             SDL_TEXTUREACCESS_STREAMING,
-            cam_width, cam_height);
+            lidar_width, lidar_height);
 
         if (!pcl_tex)
         {
@@ -424,7 +421,7 @@ void Application::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
     }
 
     // blank framebuffer
-    std::vector<uint32_t> frame_buffer(cam_width * cam_height, 0x00000000); // black
+    std::vector<uint32_t> frame_buffer(lidar_width * lidar_height, 0x00000000); // black
 
     // project 3d in 2d space
     for (const auto &point : cloud->points)
@@ -436,20 +433,20 @@ void Application::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
 
         // perspective projection
         float fov = 90.0f;
-        float aspect = static_cast<float>(cam_width) / cam_height;
+        float aspect = static_cast<float>(lidar_width) / lidar_height;
         float focal_len = 1.0f / tan((fov * 0.5f) * M_PI / 180.0f);
 
         // transform the point (basic ex: no rotation)
-        float screen_x = (point.x / -point.z) * focal_len * cam_width / aspect + cam_width / 2;
-        float screen_y = (point.y / -point.z) * focal_len * cam_height / aspect + cam_height / 2;
+        float screen_x = (point.x / -point.z) * focal_len * lidar_width / aspect + lidar_width / 2;
+        float screen_y = (point.y / -point.z) * focal_len * lidar_height / aspect + lidar_height / 2;
 
         // map to framebuffer (clip to screen dimensions)
         int pixel_x = static_cast<int>(screen_x);
         int pixel_y = static_cast<int>(screen_y);
 
-        if (pixel_x >= 0 && pixel_x < cam_width && pixel_y >= 0 && pixel_y < cam_height)
+        if (pixel_x >= 0 && pixel_x < lidar_width && pixel_y >= 0 && pixel_y < lidar_height)
         {
-            frame_buffer[pixel_y * cam_width + pixel_x] = 0xFFFFFF00;
+            frame_buffer[pixel_y * lidar_width + pixel_x] = 0xFFFFFF00;
         }
     }
 
@@ -458,7 +455,7 @@ void Application::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
     int pitch;
     if (SDL_LockTexture(pcl_tex, nullptr, &pixels, &pitch) == 0)
     {
-        memcpy(pixels, frame_buffer.data(), cam_width * cam_height * sizeof(uint32_t));
+        memcpy(pixels, frame_buffer.data(), lidar_width * lidar_height * sizeof(uint32_t));
         SDL_UnlockTexture(pcl_tex);
     }
     else
