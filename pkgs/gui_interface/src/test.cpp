@@ -12,7 +12,6 @@
 #include "imgui_impl_sdlrenderer2.h"
 
 #include "custom_elements.hpp"
-#include "formatted_elements.hpp"
 
 #include "application.hpp"
 

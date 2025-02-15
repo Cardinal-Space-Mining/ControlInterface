@@ -28,19 +28,19 @@ add_definitions(${PCL_DEFINITIONS})
 
 # imgui
 set(IMGUI_SRC_FILES
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/imgui_demo.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/imgui_draw.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/imgui_tables.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/imgui_widgets.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/imgui.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/backends/imgui_impl_sdl2.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/backends/imgui_impl_sdlrenderer2.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui_demo.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui_draw.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui_tables.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui_widgets.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/backends/imgui_impl_sdl2.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/backends/imgui_impl_sdlrenderer2.cpp
 )
 
 # implot
 set(IMPLOT_SRC_FILES
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/implot/implot.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/implot/implot_items.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/implot/implot.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/implot/implot_items.cpp
 )
 
 add_executable(main ${IMGUI_SRC_FILES} ${IMPLOT_SRC_FILES} ${CUSTOMS} src/test.cpp src/application.cpp src/motor_info.cpp src/info_plot.cpp)
@@ -53,9 +53,9 @@ target_include_directories(main PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
-target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/implot)
-target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui)
-target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include/imgui/backends)
+target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/implot)
+target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui)
+target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/backends)
 target_include_directories(main PRIVATE /usr/include/eigen3)
 
 target_compile_features(main PUBLIC c_std_99 cxx_std_20)  # Require C99 and C++20
