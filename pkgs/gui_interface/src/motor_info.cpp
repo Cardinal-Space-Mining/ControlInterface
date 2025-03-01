@@ -1,8 +1,8 @@
 #include "motor_info.hpp"
 
-MotorInfo::MotorInfo(int max) : offset(0), time(0.000), ave_temp(0), ave_out_perc(0), ave_out_volt(0), ave_out_curr(0), ave_velocity(0)
+MotorInfo::MotorInfo(int max) : offset(0), time(0.000), max_size(max), ave_temp(0), ave_out_perc(0), ave_out_volt(0), ave_out_curr(0), ave_velocity(0)
 {
-    max_size = max;
+
     temp.reserve(max_size);
     bus_volt.reserve(max_size);
     out_perc.reserve(max_size);
@@ -52,7 +52,7 @@ void MotorInfo::add_point(const TalonInfo &msg)
  */
 void MotorInfo::Erase()
 {
-    if (temp.size() > 0)
+    if (temp.empty())
     {
         temp.shrink(0);
         offset = 0;

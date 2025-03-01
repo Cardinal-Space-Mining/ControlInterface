@@ -69,7 +69,7 @@ private:
 
     void pclCallback(const sensor_msgs::msg::PointCloud2 &msg);
 
-    void pcl2ToPCL(const sensor_msgs::msg::PointCloud2 &msg, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud);
+    static void pcl2ToPCL(const sensor_msgs::msg::PointCloud2 &msg, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud);
 
     // SDL and ImGui Storing and Configs
 private:

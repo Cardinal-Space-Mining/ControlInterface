@@ -1,6 +1,8 @@
 #include "application.hpp"
 
-Application::Application() : rclcpp::Node("control_gui"), status_toggle()
+#include <bit>
+
+Application::Application() : rclcpp::Node("control_gui")
                              // Motor info Subscribers
                              ,
                              track_right_sub(this->create_subscription<TalonInfo>(
@@ -38,19 +40,19 @@ Application::Application() : rclcpp::Node("control_gui"), status_toggle()
                                                                                                   { this->pclCallback(msg); }))
 {
 
-    if (!wind)
+    if (wind == nullptr)
     {
         throw std::runtime_error("Could not create SDL window");
     }
-    if (!rend)
+    if (rend == nullptr)
     {
         throw std::runtime_error("Could not create SDL Renderer");
     }
-    if (!video_tex)
+    if (video_tex == nullptr)
     {
         throw std::runtime_error("Could not create SDL Texture: video_tex");
     }
-    if (!pcl_tex)
+    if (pcl_tex == nullptr)
     {
         throw std::runtime_error("Could not create SDL Texture: pcl_tex");
     }
@@ -91,11 +93,11 @@ Application::Application() : rclcpp::Node("control_gui"), status_toggle()
 
 Application::~Application()
 {
-    if (video_tex)
+    if (video_tex != nullptr)
     {
         SDL_DestroyTexture(video_tex);
     }
-    if (pcl_tex)
+    if (pcl_tex != nullptr)
     {
         SDL_DestroyTexture(pcl_tex);
     }
@@ -104,11 +106,11 @@ Application::~Application()
     ImGui_ImplSDL2_Shutdown();
     ImPlot::DestroyContext();
     ImGui::DestroyContext();
-    if (rend)
+    if (rend != nullptr)
     {
         SDL_DestroyRenderer(rend);
     }
-    if (wind)
+    if (wind != nullptr)
     {
         SDL_DestroyWindow(wind);
     }
@@ -135,7 +137,7 @@ void Application::update()
 {
 
     SDL_Event e;
-    while (SDL_PollEvent(&e))
+    while (SDL_PollEvent(&e) != 0)
     {
         ImGui_ImplSDL2_ProcessEvent(&e);
 
@@ -234,7 +236,7 @@ void Application::update()
                          ImGuiWindowFlags_NoFocusOnAppearing |
                          ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-        ImGui::Image((ImTextureID)video_tex, ImVec2(cam_width, cam_height));
+        ImGui::Image(std::bit_cast<ImTextureID>(video_tex), ImVec2(cam_width, cam_height));
         ImGui::End();
 
         // Menu to select which camera is being viewed (if viewing feed).
@@ -279,7 +281,7 @@ void Application::update()
                      // ImGuiWindowFlags_NoBringToFrontOnFocus
         );
 
-        ImGui::Image((ImTextureID)pcl_tex, ImVec2(lidar_width, lidar_height));
+        ImGui::Image(std::bit_cast<ImTextureID>(pcl_tex), ImVec2(lidar_width, lidar_height));
         ImGui::End();
     }
 
@@ -309,13 +311,16 @@ void Application::update_info(const TalonInfo &msg, const int id)
     case 4:
         hopper_actuator->add_point(msg);
         break;
+    default:
+        RCLCPP_DEBUG(this->get_logger(), "switch statement in %s hit default case!", __func__);
+        assert(false);
     }
 }
 
 void Application::imageCallback(const sensor_msgs::msg::CompressedImage &msg)
 {
     cv::Mat frame = cv::imdecode(cv::Mat(msg.data), cv::IMREAD_COLOR);
-    if (!video_tex)
+    if (video_tex == nullptr)
     {
 
         if (frame.empty())
@@ -324,12 +329,12 @@ void Application::imageCallback(const sensor_msgs::msg::CompressedImage &msg)
             return;
         }
 
-        if (!video_tex || frame.cols != cam_width || frame.rows != cam_height)
+        if (video_tex == nullptr || frame.cols != cam_width || frame.rows != cam_height)
         {
             cam_width = frame.cols;
             cam_height = frame.rows;
 
-            if (video_tex)
+            if (video_tex != nullptr)
             {
                 SDL_DestroyTexture(video_tex);
             }
@@ -340,7 +345,7 @@ void Application::imageCallback(const sensor_msgs::msg::CompressedImage &msg)
                 SDL_TEXTUREACCESS_STREAMING,
                 cam_width, cam_height);
 
-            if (!video_tex)
+            if (video_tex == nullptr)
             {
                 RCLCPP_ERROR(this->get_logger(), "Failed to create SDL Texture for live camera");
                 return;
@@ -348,8 +353,8 @@ void Application::imageCallback(const sensor_msgs::msg::CompressedImage &msg)
         }
     }
 
-    void *pixels;
-    int pitch;
+    void *pixels = nullptr;
+    int pitch = 0;
     if (SDL_LockTexture(video_tex, nullptr, &pixels, &pitch) == 0)
     {
         uint8_t *dst = static_cast<uint8_t *>(pixels);
@@ -357,10 +362,11 @@ void Application::imageCallback(const sensor_msgs::msg::CompressedImage &msg)
         {
             for (int x = 0; x < cam_width; ++x)
             {
-                int idx = y * pitch + x * 3;
-                dst[idx + 0] = frame.at<cv::Vec3b>(y, x)[2]; // R
-                dst[idx + 1] = frame.at<cv::Vec3b>(y, x)[1]; // G
-                dst[idx + 2] = frame.at<cv::Vec3b>(y, x)[0]; // B
+                size_t idx = y * pitch + x * 3;
+                auto &vec = frame.at<cv::Vec3b>(y, x);
+                dst[idx] = vec[2];
+                dst[idx + 1] = vec[1];
+                dst[idx + 2] = vec[0];
             }
         }
         SDL_UnlockTexture(video_tex);
@@ -368,6 +374,16 @@ void Application::imageCallback(const sensor_msgs::msg::CompressedImage &msg)
     else
     {
         RCLCPP_ERROR(this->get_logger(), "Failed to lock SDL texture");
+    }
+}
+
+namespace
+{
+    float float_cast(const uint8_t *ptr)
+    {
+        float f = 0;
+        memcpy(&f, ptr, sizeof(f));
+        return f;
     }
 }
 
@@ -384,12 +400,12 @@ void Application::pcl2ToPCL(const sensor_msgs::msg::PointCloud2 &msg, pcl::Point
     tmp_cloud.points.resize(msg.data.size() / msg.point_step);
 
     // iterate through message and extract points
-    const uint8_t *ptr = &msg.data[0];
+    const uint8_t *ptr = msg.data.data();
     for (size_t i = 0; i < tmp_cloud.points.size(); ++i, ptr += msg.point_step)
     {
-        float x = *reinterpret_cast<const float *>(ptr + msg.fields[0].offset); // TODO
-        float y = *reinterpret_cast<const float *>(ptr + msg.fields[1].offset); // TODO
-        float z = *reinterpret_cast<const float *>(ptr + msg.fields[2].offset); // TODO
+        float x = float_cast(&ptr[msg.fields[0].offset]);
+        float y = float_cast(&ptr[msg.fields[1].offset]);
+        float z = float_cast(&ptr[msg.fields[2].offset]);
 
         tmp_cloud.points[i].x = x;
         tmp_cloud.points[i].y = y;
@@ -403,9 +419,9 @@ void Application::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
 {
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
-    pcl2ToPCL(msg, cloud);
+    Application::pcl2ToPCL(msg, cloud);
 
-    if (!pcl_tex)
+    if (pcl_tex == nullptr)
     {
         pcl_tex = SDL_CreateTexture(
             rend,
@@ -413,7 +429,7 @@ void Application::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
             SDL_TEXTUREACCESS_STREAMING,
             lidar_width, lidar_height);
 
-        if (!pcl_tex)
+        if (pcl_tex == nullptr)
         {
             RCLCPP_ERROR(this->get_logger(), "Failed to create SDL Texture for point cloud");
             return;
@@ -421,7 +437,7 @@ void Application::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
     }
 
     // blank framebuffer
-    std::vector<uint32_t> frame_buffer(lidar_width * lidar_height, 0x00000000); // black
+    std::vector<uint32_t> frame_buffer(static_cast<size_t>(lidar_width * lidar_height), 0x00000000); // black
 
     // project 3d in 2d space
     for (const auto &point : cloud->points)
@@ -437,8 +453,8 @@ void Application::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
         float focal_len = 1.0f / tan((fov * 0.5f) * M_PI / 180.0f);
 
         // transform the point (basic ex: no rotation)
-        float screen_x = (point.x / -point.z) * focal_len * lidar_width / aspect + lidar_width / 2;
-        float screen_y = (point.y / -point.z) * focal_len * lidar_height / aspect + lidar_height / 2;
+        float screen_x = (point.x / -point.z) * focal_len * lidar_width / aspect + lidar_width / 2.0;
+        float screen_y = (point.y / -point.z) * focal_len * lidar_height / aspect + lidar_height / 2.0;
 
         // map to framebuffer (clip to screen dimensions)
         int pixel_x = static_cast<int>(screen_x);
@@ -451,11 +467,11 @@ void Application::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
     }
 
     // update SDL texture
-    void *pixels;
-    int pitch;
+    void *pixels = nullptr;
+    int pitch = 0;
     if (SDL_LockTexture(pcl_tex, nullptr, &pixels, &pitch) == 0)
     {
-        memcpy(pixels, frame_buffer.data(), lidar_width * lidar_height * sizeof(uint32_t));
+        memcpy(pixels, frame_buffer.data(), frame_buffer.size() * sizeof(uint32_t));
         SDL_UnlockTexture(pcl_tex);
     }
     else

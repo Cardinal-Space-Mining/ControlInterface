@@ -47,7 +47,7 @@ private:
 
     // Positions, sizes and colors of Plots and lines.
 private:
-    std::array<ImVec4,5> colors = {
+    static constexpr std::array<ImVec4, 5> colors = {
         ImVec4(0.9f, 0.1f, 0.1f, 0.5f), // Color for Right track     (id:0)
         ImVec4(0.1f, 0.9f, 0.1f, 0.5f), // Color for Left track      (id:1)
         ImVec4(0.1f, 0.1f, 0.9f, 0.5f), // Color for Trencher        (id:2)
