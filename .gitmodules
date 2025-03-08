@@ -1,3 +1,6 @@
-[submodule "pkgs/gui_interface/libs/GUIBaseCpp"]
-	path = pkgs/gui_interface/libs/GUIBaseCpp
-	url = https://github.com/dbooth05/GUIBaseCpp.git
+[submodule "pkgs/gui_interface/libs/imgui"]
+	path = pkgs/gui_interface/libs/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "pkgs/gui_interface/libs/implot"]
+	path = pkgs/gui_interface/libs/implot
+	url = https://github.com/epezent/implot.git
