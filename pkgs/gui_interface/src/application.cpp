@@ -24,6 +24,9 @@ Application::Application() : rclcpp::Node("control_gui")
                              ,
                              robot_status_pub(this->create_publisher<std_msgs::msg::Int8>(
                                  "robot_status", 10))
+                             ,
+                             motor_config_pub(this->create_publisher<std_msgs::msg::Int8>(
+                                 "config_motors", 10))
                              // Live feed camera feed
                              ,
                              image_sub(this->create_subscription<sensor_msgs::msg::CompressedImage>(
@@ -170,6 +173,14 @@ void Application::update()
             robot_status_pub->publish(msg);
 
             RCLCPP_INFO(this->get_logger(), "Robot status changed to: %d", robot_status);
+        }
+
+        if (ImGui::Button("Config Motors")) {
+            auto cmsg = std_msgs::msg::Int8();
+            cmsg.data = 0;
+            motor_config_pub->publish(cmsg);
+
+            RCLCPP_INFO(this->get_logger(), "Published msg to config motor");
         }
 
         ImGui::End();

@@ -105,7 +105,7 @@ private:
     int robot_status = 1;
     const std::vector<std::string> status_options = {"autonomous", "disabled", "teleop"};
     const std::vector<BASE_COLORS> toggle_cols = {BASE_COLORS::BLUE, BASE_COLORS::RED, BASE_COLORS::GREEN};
-    MultiToggle status_toggle;
+    MultiToggle status_toggle;    
 
     // Publisher and Subscriber Nodes
 private:
@@ -116,6 +116,7 @@ private:
     rclcpp::Subscription<TalonInfo>::SharedPtr hopper_actuator_sub;
 
     rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr robot_status_pub;
+    rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr motor_config_pub;
 
     // Motor Status Info (ImGui/ImPlot)
 private:
