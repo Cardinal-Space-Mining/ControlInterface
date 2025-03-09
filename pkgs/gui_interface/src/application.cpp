@@ -175,13 +175,25 @@ void Application::update()
             RCLCPP_INFO(this->get_logger(), "Robot status changed to: %d", robot_status);
         }
 
-        if (ImGui::Button("Config Motors")) {
+        if (ImGui::Button("Config Motors", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
             auto cmsg = std_msgs::msg::Int8();
             cmsg.data = 0;
             motor_config_pub->publish(cmsg);
 
             RCLCPP_INFO(this->get_logger(), "Published msg to config motor");
         }
+
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.2f, 0.2f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));
+        if (ImGui::Button("ESTOP", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
+            // auto cmsg = std_msgs::msg::Int8();
+            // cmsg.data = 0;
+            // motor_config_pub->publish(cmsg);
+            
+            RCLCPP_INFO(this->get_logger(), "KILL THE BOT KILL THE BOT KILL THE BOT");
+        }
+        ImGui::PopStyleColor(3);
 
         ImGui::End();
     }

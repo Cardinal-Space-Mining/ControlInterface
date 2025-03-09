@@ -37,3 +37,6 @@ install/
 log/
 .vscode
 .cache
+
+# ImGui Stuff
+imgui.ini
