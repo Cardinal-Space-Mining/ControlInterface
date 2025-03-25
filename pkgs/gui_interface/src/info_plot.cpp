@@ -75,7 +75,7 @@ void InfoPlot::Render()
         {
             ImPlot::BeginPlot("Temperature", size);
             ImPlot::SetupAxes(nullptr, "\u00b0C", x_flags, y_flags);
-            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 120);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 80);
             ImPlot::SetupAxisLimits(ImAxis_X1, hop_act->time - history, hop_act->time, ImGuiCond_Always);
 
             if (right_track && !right->temp.empty())
@@ -125,7 +125,7 @@ void InfoPlot::Render()
         {
             ImPlot::BeginPlot("Bus Voltage", size);
             ImPlot::SetupAxes(nullptr, "V", x_flags, y_flags);
-            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 30);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 20);
             ImPlot::SetupAxisLimits(ImAxis_X1, hop_act->time - history, hop_act->time, ImGuiCond_Always);
 
             if (right_track && !right->bus_volt.empty())
@@ -175,7 +175,7 @@ void InfoPlot::Render()
         {
             ImPlot::BeginPlot("Output Percent", size);
             ImPlot::SetupAxes(nullptr, "%", x_flags, y_flags);
-            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 100);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, -100, 100);
             ImPlot::SetupAxisLimits(ImAxis_X1, hop_act->time - history, hop_act->time, ImGuiCond_Always);
 
             if (right_track && !right->out_perc.empty())
@@ -225,7 +225,7 @@ void InfoPlot::Render()
         {
             ImPlot::BeginPlot("Output Voltage", size);
             ImPlot::SetupAxes(nullptr, "V", x_flags, y_flags);
-            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 30);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, -20, 20);
             ImPlot::SetupAxisLimits(ImAxis_X1, hop_act->time - history, hop_act->time, ImGuiCond_Always);
 
             if (right_track && !right->out_volt.empty())
@@ -275,7 +275,7 @@ void InfoPlot::Render()
         {
             ImPlot::BeginPlot("Output Current", size);
             ImPlot::SetupAxes(nullptr, "Current", x_flags, y_flags);
-            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 120);
+            ImPlot::SetupAxisLimits(ImAxis_Y1, 0, 10);
             ImPlot::SetupAxisLimits(ImAxis_X1, hop_act->time - history, hop_act->time, ImGuiCond_Always);
 
             if (right_track && !right->out_curr.empty())
