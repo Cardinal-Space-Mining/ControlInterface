@@ -33,6 +33,7 @@
 
 #include "motor_info.hpp"
 #include "info_plot.hpp"
+#include "hopper_capacity.hpp"
 
 using std::shared_ptr;
 using std::vector;
@@ -64,6 +65,8 @@ private:
     void update();
 
     void update_info(const TalonInfo &msg, const int id);
+
+    void update_hopper_cap(const std_msgs::msg::Float32 &msg);
 
     void imageCallback(const sensor_msgs::msg::CompressedImage &msg);
 
@@ -105,7 +108,7 @@ private:
     int robot_status = 1;
     const std::vector<std::string> status_options = {"autonomous", "disabled", "teleop"};
     const std::vector<BASE_COLORS> toggle_cols = {BASE_COLORS::BLUE, BASE_COLORS::RED, BASE_COLORS::GREEN};
-    MultiToggle status_toggle;    
+    MultiToggle status_toggle;
 
     // Publisher and Subscriber Nodes
 private:
@@ -114,6 +117,8 @@ private:
     rclcpp::Subscription<TalonInfo>::SharedPtr trencher_sub;
     rclcpp::Subscription<TalonInfo>::SharedPtr hopper_belt_sub;
     rclcpp::Subscription<TalonInfo>::SharedPtr hopper_actuator_sub;
+
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr hopper_capacity_sub;
 
     rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr robot_status_pub;
     rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr motor_config_pub;
@@ -129,6 +134,10 @@ private:
     Info trencher;
     Info hopper_belt;
     Info hopper_actuator;
+
+    // Hopper fullness detection
+private:
+    hopper_capacity cap;
 
     // Camera Feed
 private:

@@ -19,7 +19,11 @@ Application::Application() : rclcpp::Node("control_gui")
                                  { update_info(msg, 3); })),
                              hopper_actuator_sub(this->create_subscription<TalonInfo>(
                                  "hopper_info", 10, [this](const TalonInfo &msg)
-                                 { update_info(msg, 4); }))
+                                 { update_info(msg, 4); })),
+                             // Hopper capacity
+                             hopper_capacity_sub(this->create_subscription<std_msgs::msg::Float32>(
+                                 "hopper_cap_info", 10, [this](const std_msgs::msg::Float32 &msg)
+                                 { update_hopper_cap(msg); }))
                              // Robot Status Publisher
                              ,
                              robot_status_pub(this->create_publisher<std_msgs::msg::Int8>(
@@ -134,6 +138,9 @@ void Application::init_elements()
 
     // Info Plots
     plots = InfoPlot(right_track, left_track, trencher, hopper_belt, hopper_actuator, BUFFER_SIZE);
+
+    // Capacity
+    cap = hopper_capacity(hopper_capacity_sub);
 }
 
 void Application::update()
@@ -232,6 +239,17 @@ void Application::update()
         ImGui::End();
     }
 
+    // Hopper Fullness Detection
+    {
+        ImGui::SetNextWindowPos(ImVec2(0, 350), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(300, 350), ImGuiCond_Always);
+        ImGui::Begin("Hopper Fullness & Estimate Moved", nullptr,
+                     ImGuiWindowFlags_NoCollapse |
+                        ImGuiWindowFlags_NoResize);
+
+        ImGui::End();
+    }
+
     // Motor Data plots
     {
         plots.Render();
@@ -326,6 +344,10 @@ void Application::update_info(const TalonInfo &msg, const int id)
         RCLCPP_DEBUG(this->get_logger(), "switch statement in %s hit default case!", __func__);
         assert(false);
     }
+}
+
+void Application::update_hopper_cap(const std_msgs::msg::Float32 &msg) {
+    cap.calculate_capacity(msg);
 }
 
 void Application::imageCallback(const sensor_msgs::msg::CompressedImage &msg)

@@ -43,7 +43,7 @@ set(IMPLOT_SRC_FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/libs/implot/implot_items.cpp
 )
 
-add_executable(main ${IMGUI_SRC_FILES} ${IMPLOT_SRC_FILES} ${CUSTOMS} src/main.cpp src/application.cpp src/motor_info.cpp src/info_plot.cpp)
+add_executable(main ${IMGUI_SRC_FILES} ${IMPLOT_SRC_FILES} ${CUSTOMS} src/main.cpp src/application.cpp src/motor_info.cpp src/info_plot.cpp src/hopper_capacity.cpp)
 
 ament_target_dependencies(main rclcpp sensor_msgs std_msgs custom_types cv_bridge OpenCV)
 
