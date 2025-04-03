@@ -40,11 +40,8 @@ Application::Application() : rclcpp::Node("control_gui")
                                          RCLCPP_ERROR(this->get_logger(), "Unsupported encoding: %s", msg.format.c_str());
                                      }
                                      this->imageCallback(msg); })),
-                             camera_selection(this->create_publisher<std_msgs::msg::Int8>("camera_select", 10)), current_camera(4), last_camera(4)
-                             // 3D Point Cloud Map
-                             ,
-                             pcl_map_sub(this->create_subscription<sensor_msgs::msg::PointCloud2>("lidarmap_chunk", 10, [this](const sensor_msgs::msg::PointCloud2 &msg)
-                                                                                                  { this->pclCallback(msg); }))
+                             camera_selection(this->create_publisher<std_msgs::msg::Int8>("camera_select", 10)), current_camera(4), last_camera(4),
+                             map(rend, *this)
 {
 
     if (wind == nullptr)
@@ -58,10 +55,6 @@ Application::Application() : rclcpp::Node("control_gui")
     if (video_tex == nullptr)
     {
         throw std::runtime_error("Could not create SDL Texture: video_tex");
-    }
-    if (pcl_tex == nullptr)
-    {
-        throw std::runtime_error("Could not create SDL Texture: pcl_tex");
     }
 
     // Initialize ImGui
@@ -103,10 +96,6 @@ Application::~Application()
     if (video_tex != nullptr)
     {
         SDL_DestroyTexture(video_tex);
-    }
-    if (pcl_tex != nullptr)
-    {
-        SDL_DestroyTexture(pcl_tex);
     }
 
     ImGui_ImplSDLRenderer2_Shutdown();
@@ -298,6 +287,8 @@ void Application::update()
             ImGui::Text("Selected Camera: %s", camera_options[current_camera].c_str());
             ImGui::End();
         }
+
+
     }
 
     // Point Cloud Map
@@ -310,7 +301,14 @@ void Application::update()
                      // ImGuiWindowFlags_NoBringToFrontOnFocus
         );
 
-        ImGui::Image(std::bit_cast<ImTextureID>(pcl_tex), ImVec2(lidar_width, lidar_height));
+
+            SDL_Texture* tex = map.getPCL();
+            if (tex == nullptr) {
+                RCLCPP_WARN(this->get_logger(), "map.getPCL is null");
+            } else {
+                ImGui::Image(std::bit_cast<ImTextureID>(tex), ImVec2(map.getWd(), map.getHt()));
+            }
+
         ImGui::End();
     }
 
@@ -407,108 +405,5 @@ void Application::imageCallback(const sensor_msgs::msg::CompressedImage &msg)
     else
     {
         RCLCPP_ERROR(this->get_logger(), "Failed to lock SDL texture");
-    }
-}
-
-namespace
-{
-    float float_cast(const uint8_t *ptr)
-    {
-        float f = 0;
-        memcpy(&f, ptr, sizeof(f));
-        return f;
-    }
-}
-
-void Application::pcl2ToPCL(const sensor_msgs::msg::PointCloud2 &msg, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud)
-{
-    // clear cloud
-    cloud->clear();
-
-    // get the point cloud data from message
-    pcl::PointCloud<pcl::PointXYZ> tmp_cloud;
-    tmp_cloud.width = msg.width;
-    tmp_cloud.height = msg.height;
-    tmp_cloud.is_dense = msg.is_dense;
-    tmp_cloud.points.resize(msg.data.size() / msg.point_step);
-
-    // iterate through message and extract points
-    const uint8_t *ptr = msg.data.data();
-    for (size_t i = 0; i < tmp_cloud.points.size(); ++i, ptr += msg.point_step)
-    {
-        float x = float_cast(&ptr[msg.fields[0].offset]);
-        float y = float_cast(&ptr[msg.fields[1].offset]);
-        float z = float_cast(&ptr[msg.fields[2].offset]);
-
-        tmp_cloud.points[i].x = x;
-        tmp_cloud.points[i].y = y;
-        tmp_cloud.points[i].z = z;
-    }
-
-    *cloud = tmp_cloud;
-}
-
-void Application::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
-{
-    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
-
-    Application::pcl2ToPCL(msg, cloud);
-
-    if (pcl_tex == nullptr)
-    {
-        pcl_tex = SDL_CreateTexture(
-            rend,
-            SDL_PIXELFORMAT_RGBA8888,
-            SDL_TEXTUREACCESS_STREAMING,
-            lidar_width, lidar_height);
-
-        if (pcl_tex == nullptr)
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to create SDL Texture for point cloud");
-            return;
-        }
-    }
-
-    // blank framebuffer
-    std::vector<uint32_t> frame_buffer(static_cast<size_t>(lidar_width * lidar_height), 0x00000000); // black
-
-    // project 3d in 2d space
-    for (const auto &point : cloud->points)
-    {
-        if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z))
-        {
-            continue;
-        }
-
-        // perspective projection
-        float fov = 90.0f;
-        float aspect = static_cast<float>(lidar_width) / lidar_height;
-        float focal_len = 1.0f / tan((fov * 0.5f) * M_PI / 180.0f);
-
-        // transform the point (basic ex: no rotation)
-        float screen_x = (point.x / -point.z) * focal_len * lidar_width / aspect + lidar_width / 2.0;
-        float screen_y = (point.y / -point.z) * focal_len * lidar_height / aspect + lidar_height / 2.0;
-
-        // map to framebuffer (clip to screen dimensions)
-        int pixel_x = static_cast<int>(screen_x);
-        int pixel_y = static_cast<int>(screen_y);
-
-        if (pixel_x >= 0 && pixel_x < lidar_width && pixel_y >= 0 && pixel_y < lidar_height)
-        {
-            frame_buffer[pixel_y * lidar_width + pixel_x] = 0xFFFFFF00;
-        }
-    }
-
-    // update SDL texture
-    void *pixels = nullptr;
-    int pitch = 0;
-    if (SDL_LockTexture(pcl_tex, nullptr, &pixels, &pitch) == 0)
-    {
-        memcpy(pixels, frame_buffer.data(), frame_buffer.size() * sizeof(uint32_t));
-        SDL_UnlockTexture(pcl_tex);
-    }
-    else
-    {
-        RCLCPP_ERROR(this->get_logger(), "Failed to lock SDL texture (pcl)");
     }
 }

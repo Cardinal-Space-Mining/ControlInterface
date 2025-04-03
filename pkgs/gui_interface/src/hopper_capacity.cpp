@@ -1,6 +1,6 @@
 #include "hopper_capacity.hpp"
 
-const double hopper_capacity::get_capacity() {
+double hopper_capacity::get_capacity() const {
     return this->capacity;
 }
 

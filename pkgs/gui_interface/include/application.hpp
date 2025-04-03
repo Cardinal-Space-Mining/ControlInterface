@@ -8,14 +8,8 @@
 #include <std_msgs/msg/int8.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/compressed_image.hpp>
-#include <sensor_msgs/msg/point_cloud2.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <opencv2/opencv.hpp>
-
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <pcl/conversions.h>
-#include <pcl/point_types_conversion.h>
 
 #include "custom_types/msg/talon_info.hpp"
 
@@ -34,6 +28,7 @@
 #include "motor_info.hpp"
 #include "info_plot.hpp"
 #include "hopper_capacity.hpp"
+#include "lidar_map.hpp"
 
 using std::shared_ptr;
 using std::vector;
@@ -70,9 +65,6 @@ private:
 
     void imageCallback(const sensor_msgs::msg::CompressedImage &msg);
 
-    void pclCallback(const sensor_msgs::msg::PointCloud2 &msg);
-
-    static void pcl2ToPCL(const sensor_msgs::msg::PointCloud2 &msg, pcl::PointCloud<pcl::PointXYZ>::Ptr &cloud);
 
     // SDL and ImGui Storing and Configs
 private:
@@ -159,20 +151,8 @@ private:
     int last_camera;
     const std::vector<std::string> camera_options = {"Front Camera", "Rear Camera", "Left Camera", "Right Camera", "No Camera"};
 
-    // 3D Lidar Point Cloud
 private:
-    rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr pcl_map_sub;
-    int lidar_width = 800;
-    int lidar_height = 600;
-    SDL_Texture *pcl_tex = [this]()
-    {
-        SDL_Texture *pcl_tex_ = SDL_CreateTexture(rend, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, lidar_width, lidar_height);
-        if (pcl_tex_ == nullptr)
-        {
-            RCLCPP_ERROR(this->get_logger(), "Count not create SDL_CreateTexture. Error Msg: %s", SDL_GetError());
-        }
-        return pcl_tex_;
-    }();
+    LidarMap map;
 };
 
 #endif

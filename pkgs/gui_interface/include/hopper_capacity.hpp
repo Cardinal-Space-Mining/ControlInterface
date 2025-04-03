@@ -9,7 +9,7 @@ class hopper_capacity {
         hopper_capacity() : capacity(0), estimate_moved(0) {}
         hopper_capacity(rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub) : capacity_sub(sub), capacity(0), estimate_moved(0) {}
 
-        const double get_capacity();
+        double get_capacity() const;
 
         void calculate_capacity(const std_msgs::msg::Float32 &msg);
 
