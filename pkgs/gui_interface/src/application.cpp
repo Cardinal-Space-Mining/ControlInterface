@@ -225,6 +225,22 @@ void Application::update()
             ImGui::Text("\tAverage Temp: %.2f", hopper_belt->ave_temp);
         }
 
+        // Battery status
+        {
+            double battery_cap = (right_track->bus_volt.end()->y + left_track->bus_volt.end()->y + trencher->bus_volt.end()->y + hopper_belt->bus_volt.end()->y) / 4;
+            if (battery_cap > 16.0) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 255, 0, 255));
+            } else if (battery_cap > 15.0) {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 0, 255, 255));
+            } else {
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(255, 0, 0, 255));
+            }
+
+            ImGui::Text("Battery Status: %.2f V", battery_cap);
+
+            ImGui::PopStyleColor();
+        }
+
         ImGui::End();
     }
 
@@ -235,6 +251,7 @@ void Application::update()
         ImGui::Begin("Hopper Fullness & Estimate Moved", nullptr,
                      ImGuiWindowFlags_NoCollapse |
                         ImGuiWindowFlags_NoResize);
+            ImGui::Text("Current Capacity: %.3f%%", cap.get_capacity());
 
         ImGui::End();
     }
@@ -345,7 +362,7 @@ void Application::update_info(const TalonInfo &msg, const int id)
 }
 
 void Application::update_hopper_cap(const std_msgs::msg::Float32 &msg) {
-    cap.calculate_capacity(msg);
+    cap.set_capacity(msg.data);
 }
 
 void Application::imageCallback(const sensor_msgs::msg::CompressedImage &msg)

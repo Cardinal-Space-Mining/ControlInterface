@@ -1,11 +1,22 @@
 #include "hopper_capacity.hpp"
 
-double hopper_capacity::get_capacity() const {
-    return this->capacity;
+float hopper_capacity::get_capacity() const {
+    return this->percent_capacity * 100;
 }
 
-void hopper_capacity::calculate_capacity(const std_msgs::msg::Float32 &msg) {
-    /* May need to do math here */
+float hopper_capacity::get_ave_offload_cap() const {
+    return this->average_offload_cap;
+}
 
-    estimate_moved += msg.data;
+float hopper_capacity::get_estimate_moved() const {
+    return this->estimate_moved;
+}
+
+void hopper_capacity::set_capacity(float cap) {
+    if (cap < percent_capacity - 0.55f) {   // post offload cycle
+        estimate_moved += percent_capacity;
+        percent_capacity = 0.0f;
+    } else {
+        percent_capacity = cap;
+    }
 }

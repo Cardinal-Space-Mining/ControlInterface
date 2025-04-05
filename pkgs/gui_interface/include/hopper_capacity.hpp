@@ -6,17 +6,19 @@
 
 class hopper_capacity {
     public:
-        hopper_capacity() : capacity(0), estimate_moved(0) {}
-        hopper_capacity(rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub) : capacity_sub(sub), capacity(0), estimate_moved(0) {}
+        hopper_capacity() {}
+        hopper_capacity(rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub) : capacity_sub(sub) {}
 
-        double get_capacity() const;
-
-        void calculate_capacity(const std_msgs::msg::Float32 &msg);
+        void set_capacity(float cap);
+        float get_capacity() const;
+        float get_ave_offload_cap() const;
+        float get_estimate_moved() const;
 
     private:
         rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr capacity_sub;
-        double capacity;
-        double estimate_moved;
+        float percent_capacity = 0; // value between 0.00 and 1.00
+        float estimate_moved = 0;
+        float average_offload_cap = 0;
 };
 
 #endif
