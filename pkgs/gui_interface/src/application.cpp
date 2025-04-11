@@ -60,10 +60,9 @@ Application::Application() : rclcpp::Node("control_gui")
         throw std::runtime_error("Could not create SDL Texture: pcl_tex");
     }
 
-    // Initialize ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
+		ImGuiIO& io = ImGui::GetIO();
     (void)io;
     ImGui::StyleColorsDark();
 
@@ -79,6 +78,16 @@ Application::Application() : rclcpp::Node("control_gui")
         RCLCPP_ERROR(this->get_logger(), "Failed to Initialize ImGui Renderer backend");
         throw std::runtime_error("Failed to Initialize ImGui Renderer backend");
     }
+
+		// changing font size
+		{
+			ImFontConfig config;
+			config.SizePixels = 24.0f;
+			io.Fonts->Clear();
+			io.Fonts->AddFontDefault(&config);
+			ImGui_ImplSDLRenderer2_DestroyFontsTexture();
+			ImGui_ImplSDLRenderer2_CreateFontsTexture();
+		}
 
     // Initializing Timers for update gui and sending robot status
     update_timer = create_wall_timer(25ms, [this]()
