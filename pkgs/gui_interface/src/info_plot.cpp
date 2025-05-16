@@ -159,9 +159,9 @@ void InfoPlot::Render()
             }
 
             ImPlot::EndPlot();
-        }
 
-        p_idx++;
+            p_idx++;
+        }
     }
 
     if (active_plots > 3 && p_idx % 2 == 1)
