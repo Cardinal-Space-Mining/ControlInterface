@@ -1,6 +1,6 @@
 #include "application.hpp"
-
 #include <bit>
+#include <glad/glad.h>
 
 Application::Application() : rclcpp::Node("control_gui")
                              // Motor info Subscribers
@@ -27,8 +27,7 @@ Application::Application() : rclcpp::Node("control_gui")
                              // Robot Status Publisher
                              ,
                              robot_status_pub(this->create_publisher<std_msgs::msg::Int8>(
-                                 "robot_status", 10))
-                             ,
+                                 "robot_status", 10)),
                              motor_config_pub(this->create_publisher<std_msgs::msg::Int8>(
                                  "config_motors", 10))
                              // Live feed camera feed
@@ -41,80 +40,60 @@ Application::Application() : rclcpp::Node("control_gui")
                                      }
                                      this->imageCallback(msg); })),
                              camera_selection(this->create_publisher<std_msgs::msg::Int8>("camera_select", 10)), current_camera(4), last_camera(4),
-                             map(rend, *this)
+                             map(*this)
 {
+    wind = SDL_CreateWindow("Mission Control", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    if (!wind)
+        throw std::runtime_error("Failed to create SDL window");
 
-    if (wind == nullptr)
-    {
-        throw std::runtime_error("Could not create SDL window");
-    }
-    if (rend == nullptr)
-    {
-        throw std::runtime_error("Could not create SDL Renderer");
-    }
-    if (video_tex == nullptr)
-    {
-        throw std::runtime_error("Could not create SDL Texture: video_tex");
-    }
+    gl_context = SDL_GL_CreateContext(wind);
+    if (!gl_context)
+        throw std::runtime_error("Failed to create OpenGL context");
 
-    // Initialize ImGui
+    SDL_GL_MakeCurrent(wind, gl_context);
+
+    if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress))
+        throw std::runtime_error("Failed to initialize GLAD");
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void)io;
-    ImGui::StyleColorsDark();
-
     ImPlot::CreateContext();
 
-    if (!ImGui_ImplSDL2_InitForSDLRenderer(wind, rend))
-    {
-        RCLCPP_ERROR(this->get_logger(), "Failed to Initialize ImGui backend");
-        throw std::runtime_error("Failed to Initialize ImGui backend");
-    }
-    if (!ImGui_ImplSDLRenderer2_Init(rend))
-    {
-        RCLCPP_ERROR(this->get_logger(), "Failed to Initialize ImGui Renderer backend");
-        throw std::runtime_error("Failed to Initialize ImGui Renderer backend");
-    }
+    ImGui_ImplSDL2_InitForOpenGL(wind, gl_context);
+    ImGui_ImplOpenGL3_Init("#version 330 core");
 
-    // Initializing Timers for update gui and sending robot status
     update_timer = create_wall_timer(25ms, [this]()
-                                     { this->update(); });
+                                     { update(); });
     status_update_timer = create_wall_timer(100ms, [this]()
                                             {
-        std_msgs::msg::Int8 state;
-        state.data = robot_status;
-        robot_status_pub->publish(state); });
+        std_msgs::msg::Int8 msg;
+        msg.data = robot_status;
+        robot_status_pub->publish(msg); });
 
     init_elements();
-
-    RCLCPP_DEBUG(this->get_logger(), "Initialized GUI");
 }
 
 Application::~Application()
 {
-    if (video_tex != nullptr)
-    {
-        SDL_DestroyTexture(video_tex);
-    }
-
-    ImGui_ImplSDLRenderer2_Shutdown();
+    ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImPlot::DestroyContext();
     ImGui::DestroyContext();
-    if (rend != nullptr)
-    {
-        SDL_DestroyRenderer(rend);
-    }
-    if (wind != nullptr)
-    {
+
+    if (video_tex)
+        glDeleteTextures(1, &video_tex);
+    if (gl_context)
+        SDL_GL_DeleteContext(gl_context);
+    if (wind)
         SDL_DestroyWindow(wind);
-    }
+
     SDL_Quit();
 }
 
 void Application::init_elements()
 {
+    map.init();
+
     // Robot Status Toggle Switch
     status_toggle = MultiToggle(&robot_status, status_options, "status_switch", "Status");
     status_toggle.SetColors(toggle_cols);
@@ -134,9 +113,8 @@ void Application::init_elements()
 
 void Application::update()
 {
-
     SDL_Event e;
-    while (SDL_PollEvent(&e) != 0)
+    while (SDL_PollEvent(&e))
     {
         ImGui_ImplSDL2_ProcessEvent(&e);
 
@@ -146,7 +124,13 @@ void Application::update()
         }
     }
 
-    ImGui_ImplSDLRenderer2_NewFrame();
+    if (lidar_map_hovered)
+    {
+        const Uint8 *keys = SDL_GetKeyboardState(NULL);
+        map.handleKeyState(keys);
+    }
+
+    ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
 
@@ -171,7 +155,8 @@ void Application::update()
             RCLCPP_INFO(this->get_logger(), "Robot status changed to: %d", robot_status);
         }
 
-        if (ImGui::Button("Config Motors")) {
+        if (ImGui::Button("Config Motors"))
+        {
             auto cmsg = std_msgs::msg::Int8();
             cmsg.data = 0;
             motor_config_pub->publish(cmsg);
@@ -228,11 +213,16 @@ void Application::update()
         // Battery status
         {
             double battery_cap = (right_track->bus_volt.end()->y + left_track->bus_volt.end()->y + trencher->bus_volt.end()->y + hopper_belt->bus_volt.end()->y) / 4;
-            if (battery_cap > 16.0) {
+            if (battery_cap > 16.0)
+            {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 255, 0, 255));
-            } else if (battery_cap > 15.0) {
+            }
+            else if (battery_cap > 15.0)
+            {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 0, 255, 255));
-            } else {
+            }
+            else
+            {
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(255, 0, 0, 255));
             }
 
@@ -250,8 +240,8 @@ void Application::update()
         ImGui::SetNextWindowSize(ImVec2(300, 350), ImGuiCond_Always);
         ImGui::Begin("Hopper Fullness & Estimate Moved", nullptr,
                      ImGuiWindowFlags_NoCollapse |
-                        ImGuiWindowFlags_NoResize);
-            ImGui::Text("Current Capacity: %.3f%%", cap.get_capacity());
+                         ImGuiWindowFlags_NoResize);
+        ImGui::Text("Current Capacity: %.3f%%", cap.get_capacity());
 
         ImGui::End();
     }
@@ -271,7 +261,7 @@ void Application::update()
                          ImGuiWindowFlags_NoFocusOnAppearing |
                          ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-        ImGui::Image(std::bit_cast<ImTextureID>(video_tex), ImVec2(cam_width, cam_height));
+        ImGui::Image((ImTextureID)video_tex, ImVec2(cam_width, cam_height));
         ImGui::End();
 
         // Menu to select which camera is being viewed (if viewing feed).
@@ -304,13 +294,11 @@ void Application::update()
             ImGui::Text("Selected Camera: %s", camera_options[current_camera].c_str());
             ImGui::End();
         }
-
-
     }
 
     // Point Cloud Map
     {
-        ImGui::SetNextWindowSize(ImVec2(900, 900), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(map.getWd(), map.getHt()), ImGuiCond_Always);
         ImGui::Begin("LiDAR Map", nullptr,
                      ImGuiWindowFlags_NoCollapse |
                          ImGuiWindowFlags_NoResize
@@ -318,22 +306,25 @@ void Application::update()
                      // ImGuiWindowFlags_NoBringToFrontOnFocus
         );
 
-
-            SDL_Texture* tex = map.getPCL();
-            if (tex == nullptr) {
-                RCLCPP_WARN(this->get_logger(), "map.getPCL is null");
-            } else {
-                ImGui::Image(std::bit_cast<ImTextureID>(tex), ImVec2(map.getWd(), map.getHt()));
-            }
-
+        GLuint tex = map.getTexture();
+        if (!tex)
+        {
+            RCLCPP_WARN(this->get_logger(), "map.getPCL is null");
+        }
+        else
+        {
+            ImGui::Image((ImTextureID)tex, ImVec2(map.getWd(), map.getHt()));
+        }
+        lidar_map_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
         ImGui::End();
     }
 
     ImGui::Render();
-    SDL_SetRenderDrawColor(rend, 0, 0, 0, 255);
-    SDL_RenderClear(rend);
-    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), rend);
-    SDL_RenderPresent(rend);
+    glViewport(0, 0, WIDTH, HEIGHT);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    SDL_GL_SwapWindow(wind);
 }
 
 void Application::update_info(const TalonInfo &msg, const int id)
@@ -361,66 +352,36 @@ void Application::update_info(const TalonInfo &msg, const int id)
     }
 }
 
-void Application::update_hopper_cap(const std_msgs::msg::Float32 &msg) {
+void Application::update_hopper_cap(const std_msgs::msg::Float32 &msg)
+{
     cap.set_capacity(msg.data);
 }
 
 void Application::imageCallback(const sensor_msgs::msg::CompressedImage &msg)
 {
     cv::Mat frame = cv::imdecode(cv::Mat(msg.data), cv::IMREAD_COLOR);
-    if (video_tex == nullptr)
+    if (frame.empty())
     {
-
-        if (frame.empty())
-        {
-            RCLCPP_ERROR(this->get_logger(), "Failed to decode compressed image");
-            return;
-        }
-
-        if (video_tex == nullptr || frame.cols != cam_width || frame.rows != cam_height)
-        {
-            cam_width = frame.cols;
-            cam_height = frame.rows;
-
-            if (video_tex != nullptr)
-            {
-                SDL_DestroyTexture(video_tex);
-            }
-
-            video_tex = SDL_CreateTexture(
-                rend,
-                SDL_PIXELFORMAT_BGR24,
-                SDL_TEXTUREACCESS_STREAMING,
-                cam_width, cam_height);
-
-            if (video_tex == nullptr)
-            {
-                RCLCPP_ERROR(this->get_logger(), "Failed to create SDL Texture for live camera");
-                return;
-            }
-        }
+        RCLCPP_ERROR(this->get_logger(), "Failed to decode compressed image");
+        return;
     }
 
-    void *pixels = nullptr;
-    int pitch = 0;
-    if (SDL_LockTexture(video_tex, nullptr, &pixels, &pitch) == 0)
+    cam_width = frame.cols;
+    cam_height = frame.rows;
+
+    if (video_tex == 0)
     {
-        uint8_t *dst = static_cast<uint8_t *>(pixels);
-        for (int y = 0; y < cam_height; ++y)
-        {
-            for (int x = 0; x < cam_width; ++x)
-            {
-                size_t idx = y * pitch + x * 3;
-                auto &vec = frame.at<cv::Vec3b>(y, x);
-                dst[idx] = vec[2];
-                dst[idx + 1] = vec[1];
-                dst[idx + 2] = vec[0];
-            }
-        }
-        SDL_UnlockTexture(video_tex);
+        glGenTextures(1, &video_tex);
+        glBindTexture(GL_TEXTURE_2D, video_tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, cam_width, cam_height, 0, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
     }
     else
     {
-        RCLCPP_ERROR(this->get_logger(), "Failed to lock SDL texture");
+        glBindTexture(GL_TEXTURE_2D, video_tex);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cam_width, cam_height, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
     }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
