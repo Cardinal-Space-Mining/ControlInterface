@@ -375,12 +375,12 @@ void Application::imageCallback(const sensor_msgs::msg::CompressedImage &msg)
         glBindTexture(GL_TEXTURE_2D, video_tex);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, cam_width, cam_height, 0, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, cam_width, cam_height, 0, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
     }
     else
     {
         glBindTexture(GL_TEXTURE_2D, video_tex);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cam_width, cam_height, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cam_width, cam_height, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
     }
 
     glBindTexture(GL_TEXTURE_2D, 0);

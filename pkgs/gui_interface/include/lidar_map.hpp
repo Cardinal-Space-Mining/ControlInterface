@@ -35,10 +35,6 @@ private:
     int map_wd = 800;
     int map_ht = 600;
 
-    const float grid_step = 1.0f;
-    const float grid_min = -10.f * grid_step;
-    const float grid_max = 10.f * grid_step;
-
     // Point cloud data
     std::vector<float> points_xyz;
     bool points_dirty = false;
