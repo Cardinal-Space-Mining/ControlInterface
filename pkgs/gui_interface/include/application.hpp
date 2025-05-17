@@ -5,11 +5,12 @@
 #include <vector>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/int8.hpp>
+#include <std_msgs/msg/int32.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/compressed_image.hpp>
 #include <cv_bridge/cv_bridge.hpp>
 #include <opencv2/opencv.hpp>
-#include "custom_types/msg/talon_info.hpp"
+#include "talon_msgs/msg/talon_info.hpp"
 
 #include <SDL2/SDL.h>
 #include <glad/glad.h>
@@ -25,10 +26,14 @@
 #include "hopper_capacity.hpp"
 #include "lidar_map.hpp"
 
+#ifndef GUI_PUBLISH_HEARTBEAT
+#define GUI_PUBLISH_HEARTBEAT 1
+#endif
+
 using std::shared_ptr;
 using std::vector;
 using namespace std::chrono_literals;
-using namespace custom_types::msg;
+using namespace talon_msgs::msg;
 using Info = shared_ptr<MotorInfo>;
 
 class Application : public rclcpp::Node
@@ -85,6 +90,9 @@ private:
 
     rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr robot_status_pub;
     rclcpp::Publisher<std_msgs::msg::Int8>::SharedPtr motor_config_pub;
+    #if GUI_PUBLISH_HEARTBEAT
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr heartbeat;
+    #endif
 
     // Motor Status Info (ImGui/ImPlot)
 private:

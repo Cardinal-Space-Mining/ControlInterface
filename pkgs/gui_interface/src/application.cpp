@@ -62,13 +62,22 @@ Application::Application() : rclcpp::Node("control_gui")
     ImGui_ImplSDL2_InitForOpenGL(wind, gl_context);
     ImGui_ImplOpenGL3_Init("#version 330 core");
 
+    #if GUI_PUBLISH_HEARTBEAT
+    heartbeat = this->create_publisher<std_msgs::msg::Int32>("heartbeat", 10);
+    #endif
+
     update_timer = create_wall_timer(25ms, [this]()
                                      { update(); });
     status_update_timer = create_wall_timer(100ms, [this]()
                                             {
         std_msgs::msg::Int8 msg;
         msg.data = robot_status;
-        robot_status_pub->publish(msg); });
+        robot_status_pub->publish(msg);
+
+        #if GUI_PUBLISH_HEARTBEAT
+        heartbeat->publish(std_msgs::msg::Int32{}.set__data(250));
+        #endif
+    });
 
     init_elements();
 }
@@ -251,10 +260,34 @@ void Application::update()
         plots.Render();
     }
 
-    // Camera feed
+    // Point Cloud Map
     {
         ImGui::SetNextWindowPos(ImVec2(300, 0), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(900, 525), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(map.getWd(), map.getHt()), ImGuiCond_Always);
+        ImGui::Begin("LiDAR Map", nullptr,
+                     ImGuiWindowFlags_NoCollapse |
+                         ImGuiWindowFlags_NoResize |
+                     // ImGuiWindowFlags_NoFocusOnAppearing |
+                        ImGuiWindowFlags_NoBringToFrontOnFocus
+        );
+
+        GLuint tex = map.getTexture();
+        if (!tex)
+        {
+            RCLCPP_WARN(this->get_logger(), "map.getPCL is null");
+        }
+        else
+        {
+            ImGui::Image((ImTextureID)tex, ImVec2(map.getWd(), map.getHt()));
+        }
+        lidar_map_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
+        ImGui::End();
+    }
+
+    // Camera feed
+    {
+        ImGui::SetNextWindowPos(ImVec2(1200, 0), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(640, 480), ImGuiCond_Always);
         ImGui::Begin("Video Display", nullptr,
                      ImGuiWindowFlags_NoCollapse |
                          ImGuiWindowFlags_NoResize |
@@ -267,7 +300,7 @@ void Application::update()
         // Menu to select which camera is being viewed (if viewing feed).
         // Will turn on and off publisher on robot to reduce traffic
         {
-            ImGui::SetNextWindowPos(ImVec2(955, 27), ImGuiCond_Always);
+            ImGui::SetNextWindowPos(ImVec2(1200, 480), ImGuiCond_Always);
             ImGui::SetNextWindowSize(ImVec2(240, 480), ImGuiCond_Always);
             ImGui::Begin("Camera Feed Selection", nullptr,
                          ImGuiWindowFlags_NoResize);
@@ -294,29 +327,6 @@ void Application::update()
             ImGui::Text("Selected Camera: %s", camera_options[current_camera].c_str());
             ImGui::End();
         }
-    }
-
-    // Point Cloud Map
-    {
-        ImGui::SetNextWindowSize(ImVec2(map.getWd(), map.getHt()), ImGuiCond_Always);
-        ImGui::Begin("LiDAR Map", nullptr,
-                     ImGuiWindowFlags_NoCollapse |
-                         ImGuiWindowFlags_NoResize
-                     // ImGuiWindowFlags_NoFocusOnAppearing |
-                     // ImGuiWindowFlags_NoBringToFrontOnFocus
-        );
-
-        GLuint tex = map.getTexture();
-        if (!tex)
-        {
-            RCLCPP_WARN(this->get_logger(), "map.getPCL is null");
-        }
-        else
-        {
-            ImGui::Image((ImTextureID)tex, ImVec2(map.getWd(), map.getHt()));
-        }
-        lidar_map_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup);
-        ImGui::End();
     }
 
     ImGui::Render();

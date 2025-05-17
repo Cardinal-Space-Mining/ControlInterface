@@ -32,8 +32,8 @@ private:
     GLuint gl_tex = 0;
     GLuint gl_rbo = 0;
     GLuint shader_program = 0;
-    int map_wd = 800;
-    int map_ht = 600;
+    int map_wd = 900;
+    int map_ht = 525;
 
     // Point cloud data
     std::vector<float> points_xyz;

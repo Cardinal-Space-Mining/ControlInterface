@@ -3,11 +3,11 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-#include "custom_types/msg/talon_info.hpp"
+#include "talon_msgs/msg/talon_info.hpp"
 
 using std::make_shared;
 using namespace std::chrono_literals;
-using namespace custom_types::msg;
+using namespace talon_msgs::msg;
 
 class InfoGen : public rclcpp::Node {
     public:

@@ -3,6 +3,8 @@
 #include <cmath>
 #include <stdexcept>
 
+#define LIDAR_TOPIC "/cardinal_perception/filtered_scan"
+
 GLuint compileShader(GLenum type, const char *src)
 {
     GLuint shader = glCreateShader(type);
@@ -103,7 +105,7 @@ void LidarMap::init()
 
     // PointCloud subscriber
     pcl_sub = parent.create_subscription<sensor_msgs::msg::PointCloud2>(
-        "multiscan/lidar_scan", rclcpp::SensorDataQoS{},
+        LIDAR_TOPIC, rclcpp::SensorDataQoS{},
         [this](const sensor_msgs::msg::PointCloud2 &msg)
         {
             this->pclCallback(msg);

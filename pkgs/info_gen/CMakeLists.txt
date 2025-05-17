@@ -8,11 +8,11 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(custom_types REQUIRED)
+find_package(talon_msgs REQUIRED)
 
 add_executable(main src/main.cpp)
 
-ament_target_dependencies(main rclcpp custom_types)
+ament_target_dependencies(main rclcpp talon_msgs)
 
 target_compile_features(main PUBLIC c_std_99 cxx_std_20)
 

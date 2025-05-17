@@ -10,7 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(custom_types REQUIRED)
+find_package(talon_msgs REQUIRED)
 find_package(pcl_ros REQUIRED)
 
 # for ros video
@@ -63,7 +63,7 @@ add_executable(main
   src/main.cpp src/application.cpp src/motor_info.cpp src/info_plot.cpp src/hopper_capacity.cpp src/lidar_map.cpp
 )
 
-ament_target_dependencies(main rclcpp sensor_msgs std_msgs custom_types cv_bridge OpenCV)
+ament_target_dependencies(main rclcpp sensor_msgs std_msgs talon_msgs cv_bridge OpenCV)
 
 target_include_directories(main PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -93,6 +93,9 @@ target_link_libraries(main ${PCL_LIBRARIES})
 
 install(TARGETS main
   DESTINATION lib/${PROJECT_NAME})
+
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

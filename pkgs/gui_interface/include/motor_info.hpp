@@ -7,9 +7,9 @@
 
 #include "imgui.h"
 
-#include "custom_types/msg/talon_info.hpp"
+#include "talon_msgs/msg/talon_info.hpp"
 
-using namespace custom_types::msg;
+using namespace talon_msgs::msg;
 using std::vector;
 
 /*
