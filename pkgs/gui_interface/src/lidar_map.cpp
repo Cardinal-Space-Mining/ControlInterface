@@ -84,6 +84,23 @@ void LidarMap::init()
         throw std::runtime_error(std::string("Shader link error: ") + log);
     }
 
+    // Create grid lines (static geometry)
+    createGridLines();
+
+    // point cloud VBO setup
+    glGenVertexArrays(1, &points_vao);
+    glBindVertexArray(points_vao);
+
+    glGenBuffers(1, &points_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
+    glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW); // Initially empty
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
     // PointCloud subscriber
     pcl_sub = parent.create_subscription<sensor_msgs::msg::PointCloud2>(
         "multiscan/lidar_scan", rclcpp::SensorDataQoS{},
@@ -92,13 +109,15 @@ void LidarMap::init()
             this->pclCallback(msg);
         });
 
-    createGridLines();
-
     RCLCPP_INFO(parent.get_logger(), "LidarMap initialized (OpenGL mode)");
 }
 
 void LidarMap::createGridLines()
 {
+    constexpr float grid_step = 1.0f;
+    constexpr float grid_min = -10.f * grid_step;
+    constexpr float grid_max = 10.f * grid_step;
+
     // XY plane lines (parallel to X, sweeping along Y)
     for (float y = grid_min; y <= grid_max; y += grid_step)
     {
@@ -150,21 +169,28 @@ LidarMap::~LidarMap()
     glDeleteRenderbuffers(1, &gl_rbo);
     glDeleteProgram(shader_program);
 
+    if (points_vbo)
+        glDeleteBuffers(1, &points_vbo);
+    if (points_vao)
+        glDeleteVertexArrays(1, &points_vao);
+
     if (grid_vbo)
         glDeleteBuffers(1, &grid_vbo);
     if (grid_vao)
         glDeleteVertexArrays(1, &grid_vao);
 }
 
-GLuint LidarMap::getTexture() const { return gl_tex; }
-int LidarMap::getWd() const { return map_wd; }
-int LidarMap::getHt() const { return map_ht; }
+GLuint LidarMap::getTexture()
+{
+    renderToFramebuffer();
+    return gl_tex;
+}
 
 void LidarMap::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
 {
     static auto last_update = std::chrono::steady_clock::now();
     auto now = std::chrono::steady_clock::now();
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_update).count() < 32) // 30 FPS
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_update).count() < 1000 / 10) // only update at 10 Hz
         return;
 
     points_xyz.clear();
@@ -184,7 +210,7 @@ void LidarMap::pclCallback(const sensor_msgs::msg::PointCloud2 &msg)
         }
     }
 
-    renderToFramebuffer();
+    points_dirty = true;
     last_update = now;
 }
 
@@ -290,24 +316,21 @@ void LidarMap::renderToFramebuffer()
     glUniformMatrix4fv(loc_proj, 1, GL_FALSE, proj);
 
     // Draw point cloud
-    GLuint vao, vbo;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, points_xyz.size() * sizeof(float), points_xyz.data(), GL_STATIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
+    if (points_dirty)
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
+        glBufferData(GL_ARRAY_BUFFER, points_xyz.size() * sizeof(float), points_xyz.data(), GL_DYNAMIC_DRAW);
+        points_dirty = false;
+    }
 
     glUniform4f(loc_color, 0.0f, 1.0f, 0.0f, 1.0f); // Set point color to green
 
+    glBindVertexArray(points_vao);
+    glUniform4f(loc_color, 0.0f, 1.0f, 0.0f, 1.0f);
     glEnable(GL_PROGRAM_POINT_SIZE);
     glPointSize(2.5f);
     glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(points_xyz.size() / 3));
     glBindVertexArray(0);
-    glDeleteBuffers(1, &vbo);
-    glDeleteVertexArrays(1, &vao);
 
     // Draw grid lines
     glUniform4f(loc_color, 1.0f, 1.0f, 1.0f, 0.3f); // Set grid color to white

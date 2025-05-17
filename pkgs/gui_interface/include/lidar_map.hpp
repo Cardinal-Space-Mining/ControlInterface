@@ -15,9 +15,9 @@ public:
 
     void init();
 
-    GLuint getTexture() const;
-    int getWd() const;
-    int getHt() const;
+    GLuint getTexture();
+    int getWd() const { return map_wd; };
+    int getHt() const { return map_ht; };
 
     void handleKeyState(const Uint8 *keys);
 
@@ -39,6 +39,12 @@ private:
     const float grid_min = -10.f * grid_step;
     const float grid_max = 10.f * grid_step;
 
+    // Point cloud data
+    std::vector<float> points_xyz;
+    bool points_dirty = false;
+    GLuint points_vao = 0;
+    GLuint points_vbo = 0;
+
     // Grid lines
     void createGridLines();
     std::vector<float> grid_lines;
@@ -54,7 +60,5 @@ private:
     int last_mouse_x = 0;
     int last_mouse_y = 0;
     bool rotating = false;
-
-    std::vector<float> points_xyz;
 };
 #endif
