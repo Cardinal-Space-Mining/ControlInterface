@@ -19,7 +19,6 @@ using std::make_shared;
 
 int main(int argc, char *argv[])
 {
-
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0)
     {
         std::printf("Error: %s\n", SDL_GetError());

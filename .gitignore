@@ -37,3 +37,6 @@ install/
 log/
 .vscode
 .cache
+
+# Saved config files
+*.ini

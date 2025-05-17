@@ -34,7 +34,7 @@ set(IMGUI_SRC_FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui_widgets.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/imgui.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/backends/imgui_impl_sdl2.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/backends/imgui_impl_sdlrenderer2.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui/backends/imgui_impl_opengl3.cpp
 )
 
 # implot
@@ -43,15 +43,35 @@ set(IMPLOT_SRC_FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/libs/implot/implot_items.cpp
 )
 
-add_executable(main ${IMGUI_SRC_FILES} ${IMPLOT_SRC_FILES} ${CUSTOMS} src/main.cpp src/application.cpp src/motor_info.cpp src/info_plot.cpp src/hopper_capacity.cpp)
+# glad
+set(GLAD_SRC 
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/glad/src/glad.c
+)
+
+set_source_files_properties( # suppress warnings in glad compile
+  ${CMAKE_CURRENT_SOURCE_DIR}/libs/glad/src/glad.c
+  PROPERTIES COMPILE_FLAGS "-Wno-pedantic -Wno-cast-function-type"
+)
+
+
+
+add_executable(main 
+  ${IMGUI_SRC_FILES}
+  ${IMPLOT_SRC_FILES}
+  ${GLAD_SRC}
+  ${CUSTOMS}
+  src/main.cpp src/application.cpp src/motor_info.cpp src/info_plot.cpp src/hopper_capacity.cpp src/lidar_map.cpp
+)
 
 ament_target_dependencies(main rclcpp sensor_msgs std_msgs custom_types cv_bridge OpenCV)
 
 target_include_directories(main PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/GUIBaseCpp/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/glad/include>
   $<INSTALL_INTERFACE:include>
 )
+
 
 target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/implot)
 target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui)
